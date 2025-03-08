@@ -11,40 +11,54 @@ type WordForm struct {
 	IsLemma    bool              `json:"is_lemma,omitempty"`   // Whether this form is the lemma/base form
 }
 
+// Definition represents a single definition with its type and examples
+type Definition struct {
+	Text      string   `json:"text"`
+	WordType  string   `json:"word_type,omitempty"` // noun, verb, adjective, etc.
+	Examples  []string `json:"examples,omitempty"`
+	Register  string   `json:"register,omitempty"`  // formal, informal, slang, etc.
+	Notes     []string `json:"notes,omitempty"`
+}
+
 // Word represents a vocabulary word with its definitions and metadata
 type Word struct {
-	ID            string            `json:"id"`
-	Text          string            `json:"text"`
-	Language      string            `json:"language"`
-	Definitions   []string          `json:"definitions,omitempty"`
-	Examples      []string          `json:"examples,omitempty"`
-	Pronunciation string            `json:"pronunciation,omitempty"`
-	Etymology     string            `json:"etymology,omitempty"`
-	Translations  map[string]string `json:"translations,omitempty"`
-	Synonyms      []string          `json:"synonyms,omitempty"`
-	WordType      string            `json:"word_type,omitempty"`
-	Gender        string            `json:"gender,omitempty"`
-	WordForms     []WordForm        `json:"word_forms,omitempty"`
-	SearchTerms   []string          `json:"search_terms,omitempty"` // All searchable forms of the word
-	Lemma         string            `json:"lemma,omitempty"`        // Base form of the word
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
+	ID            string                 `json:"id"`
+	Text          string                 `json:"text"`           // The canonical form
+	Language      string                 `json:"language"`
+	Definitions   []Definition           `json:"definitions,omitempty"`
+	Examples      []string               `json:"examples,omitempty"` // General examples not tied to a specific definition
+	Pronunciation map[string]string      `json:"pronunciation,omitempty"` // Different pronunciation formats (IPA, audio URL, etc.)
+	Etymology     string                 `json:"etymology,omitempty"`
+	Translations  map[string]string      `json:"translations,omitempty"`
+	Synonyms      []string               `json:"synonyms,omitempty"`
+	Antonyms      []string               `json:"antonyms,omitempty"`
+	WordType      string                 `json:"word_type,omitempty"` // Primary word type if multiple exist
+	Gender        string                 `json:"gender,omitempty"`
+	WordForms     []WordForm             `json:"word_forms,omitempty"`
+	SearchTerms   []string               `json:"search_terms,omitempty"` // All searchable forms of the word
+	Lemma         string                 `json:"lemma,omitempty"`        // Base form of the word
+	UsageNotes    []string               `json:"usage_notes,omitempty"`  // General usage information
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
 }
 
 // NewWord creates a new Word entity
 func NewWord(text, language string) *Word {
 	now := time.Now()
 	return &Word{
-		Text:         text,
-		Language:     language,
-		Definitions:  []string{},
-		Examples:     []string{},
-		Synonyms:     []string{},
-		Translations: make(map[string]string),
-		WordForms:    []WordForm{},
-		SearchTerms:  []string{text}, // Initialize with the main text as a search term
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		Text:          text,
+		Language:      language,
+		Definitions:   []Definition{},
+		Examples:      []string{},
+		Pronunciation: make(map[string]string),
+		Synonyms:      []string{},
+		Antonyms:      []string{},
+		Translations:  make(map[string]string),
+		WordForms:     []WordForm{},
+		SearchTerms:   []string{text}, // Initialize with the main text as a search term
+		UsageNotes:    []string{},
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 }
 
@@ -95,5 +109,63 @@ func (w *Word) SetLemma(lemma string) {
 	}
 
 	// Update the UpdatedAt timestamp
+	w.UpdatedAt = time.Now()
+}
+
+// AddDefinition adds a new definition to the word
+func (w *Word) AddDefinition(text, wordType string, examples []string) {
+	w.Definitions = append(w.Definitions, Definition{
+		Text:     text,
+		WordType: wordType,
+		Examples: examples,
+	})
+	
+	// Update the primary word type if not set
+	if w.WordType == "" && wordType != "" {
+		w.WordType = wordType
+	}
+	
+	// Update the UpdatedAt timestamp
+	w.UpdatedAt = time.Now()
+}
+
+// AddSynonym adds a new synonym if not already present
+func (w *Word) AddSynonym(synonym string) {
+	// Check if already exists
+	for _, s := range w.Synonyms {
+		if s == synonym {
+			return
+		}
+	}
+	
+	w.Synonyms = append(w.Synonyms, synonym)
+	w.UpdatedAt = time.Now()
+}
+
+// AddAntonym adds a new antonym if not already present
+func (w *Word) AddAntonym(antonym string) {
+	// Check if already exists
+	for _, a := range w.Antonyms {
+		if a == antonym {
+			return
+		}
+	}
+	
+	w.Antonyms = append(w.Antonyms, antonym)
+	w.UpdatedAt = time.Now()
+}
+
+// AddUsageNote adds a new usage note
+func (w *Word) AddUsageNote(note string) {
+	w.UsageNotes = append(w.UsageNotes, note)
+	w.UpdatedAt = time.Now()
+}
+
+// SetPronunciation sets a pronunciation in the specified format
+func (w *Word) SetPronunciation(format, value string) {
+	if w.Pronunciation == nil {
+		w.Pronunciation = make(map[string]string)
+	}
+	w.Pronunciation[format] = value
 	w.UpdatedAt = time.Now()
 }
