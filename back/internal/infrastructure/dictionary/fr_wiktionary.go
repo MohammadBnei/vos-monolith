@@ -116,6 +116,8 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 				// Add the definition
 				newWord.Definitions = append(newWord.Definitions, definitionText)
+				currentDefinitionIndex = len(newWord.Definitions) - 1
+				w.logger.Debug().Int("index", currentDefinitionIndex).Str("definition", definitionText).Msg("Found definition")
 
 				// Look for examples within this definition
 				li.ForEach("ul li span.example", func(_ int, example *colly.HTMLElement) {
@@ -124,6 +126,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						// Clean up the example text
 						exampleText = strings.ReplaceAll(exampleText, "« ", "")
 						exampleText = strings.ReplaceAll(exampleText, " »", "")
+						w.logger.Debug().Str("example", exampleText).Msg("Found example")
 						newWord.Examples = append(newWord.Examples, exampleText)
 					}
 				})
