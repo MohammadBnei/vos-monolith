@@ -14,6 +14,8 @@ type Word struct {
 	Pronunciation string            `json:"pronunciation,omitempty"`
 	Etymology     string            `json:"etymology,omitempty"`
 	Translations  map[string]string `json:"translations,omitempty"`
+	Synonyms      []string          `json:"synonyms,omitempty"`
+	WordType      string            `json:"word_type,omitempty"`
 	CreatedAt     time.Time         `json:"created_at"`
 	UpdatedAt     time.Time         `json:"updated_at"`
 }
@@ -26,6 +28,7 @@ func NewWord(text, language string) *Word {
 		Language:     language,
 		Definitions:  []string{},
 		Examples:     []string{},
+		Synonyms:     []string{},
 		Translations: make(map[string]string),
 		CreatedAt:    now,
 		UpdatedAt:    now,
