@@ -13,6 +13,11 @@ import (
 	"voconsteroid/internal/domain/word"
 )
 
+// Import the Definition type
+import (
+	. "voconsteroid/internal/domain/word"
+)
+
 // FrenchWiktionaryAPI implements the word.DictionaryAPI interface for French Wiktionary
 type FrenchWiktionaryAPI struct {
 	logger     zerolog.Logger
@@ -162,7 +167,10 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		pronunciation := strings.TrimSpace(e.Text)
 		if strings.HasPrefix(pronunciation, "\\") && strings.HasSuffix(pronunciation, "\\") {
 			w.logger.Debug().Str("pronunciation", pronunciation).Msg("Found pronunciation")
-			newWord.SetPronunciation("ipa", pronunciation)
+			if newWord.Pronunciation == nil {
+				newWord.Pronunciation = make(map[string]string)
+			}
+			newWord.Pronunciation["ipa"] = pronunciation
 		}
 	})
 
@@ -303,7 +311,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				})
 
 				// Add the definition using the entity method
-				newWord.AddDefinition(definitionText, "noun", examples)
+				newWord.Definitions = append(newWord.Definitions, Definition{
+					Text:     definitionText,
+					WordType: "noun",
+					Examples: examples,
+				})
 				w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
 
 				foundDefinitions = true
@@ -450,7 +462,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					definitionText := strings.TrimSpace(li.Text)
 					if definitionText != "" && len(definitionText) > 10 {
 						w.logger.Debug().Str("definition", definitionText).Msg("Found definition with fallback method")
-						newWord.AddDefinition(definitionText, "", []string{})
+						newWord.Definitions = append(newWord.Definitions, Definition{
+							Text:     definitionText,
+							WordType: "",
+							Examples: []string{},
+						})
 						foundDefinitions = true
 					}
 				}
@@ -463,7 +479,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						fullText := strings.TrimSpace(p.Text)
 						if fullText != "" && len(fullText) > 10 && !strings.HasPrefix(fullText, "From") {
 							w.logger.Debug().Str("definition", fullText).Msg("Found definition in paragraph with fallback method")
-							newWord.AddDefinition(fullText, "", []string{})
+							newWord.Definitions = append(newWord.Definitions, Definition{
+								Text:     fullText,
+								WordType: "",
+								Examples: []string{},
+							})
 							foundDefinitions = true
 						}
 					}
