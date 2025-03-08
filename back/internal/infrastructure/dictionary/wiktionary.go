@@ -24,30 +24,46 @@ func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
 	}
 }
 
-// getBaseURL returns the appropriate Wiktionary URL based on the language
-// This is a variable to allow for testing
-func (w *WiktionaryAPI) getBaseURL func(language string) string = func(language string) string {
-	// Map of language codes to Wiktionary subdomains
-	langMap := map[string]string{
-		"en": "en",
-		"fr": "fr",
-		"es": "es",
-		"de": "de",
-		"it": "it",
-		"pt": "pt",
-		"ru": "ru",
-		"ja": "ja",
-		"zh": "zh",
-		// Add more languages as needed
-	}
+// getBaseURL is a function variable that returns the appropriate Wiktionary URL based on the language
+// This allows for easy mocking in tests
+var (
+	defaultGetBaseURL = func(language string) string {
+		// Map of language codes to Wiktionary subdomains
+		langMap := map[string]string{
+			"en": "en",
+			"fr": "fr",
+			"es": "es",
+			"de": "de",
+			"it": "it",
+			"pt": "pt",
+			"ru": "ru",
+			"ja": "ja",
+			"zh": "zh",
+			// Add more languages as needed
+		}
 
-	// Get the subdomain for the language, default to English
-	subdomain, ok := langMap[language]
-	if !ok {
-		subdomain = "en"
-	}
+		// Get the subdomain for the language, default to English
+		subdomain, ok := langMap[language]
+		if !ok {
+			subdomain = "en"
+		}
 
-	return fmt.Sprintf("https://%s.wiktionary.org/wiki", subdomain)
+		return fmt.Sprintf("https://%s.wiktionary.org/wiki", subdomain)
+	}
+)
+
+// WiktionaryAPI implements the word.DictionaryAPI interface for Wiktionary
+type WiktionaryAPI struct {
+	logger    zerolog.Logger
+	getBaseURL func(language string) string
+}
+
+// NewWiktionaryAPI creates a new Wiktionary scraper
+func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
+	return &WiktionaryAPI{
+		logger:    logger.With().Str("component", "wiktionary_scraper").Logger(),
+		getBaseURL: defaultGetBaseURL,
+	}
 }
 
 // FetchWord retrieves word information from Wiktionary by scraping the web page

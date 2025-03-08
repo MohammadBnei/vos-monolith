@@ -23,10 +23,6 @@ func TestNewWiktionaryAPI(t *testing.T) {
 }
 
 func TestGetBaseURL(t *testing.T) {
-	// Setup
-	logger := zerolog.New(zerolog.NewTestWriter(t))
-	api := NewWiktionaryAPI(logger)
-
 	// Test cases
 	testCases := []struct {
 		language string
@@ -40,7 +36,7 @@ func TestGetBaseURL(t *testing.T) {
 
 	// Execute and assert
 	for _, tc := range testCases {
-		result := api.getBaseURL(tc.language)
+		result := defaultGetBaseURL(tc.language)
 		assert.Equal(t, tc.expected, result, "For language %s", tc.language)
 	}
 }
@@ -85,9 +81,7 @@ func TestFetchWord_Success(t *testing.T) {
 		logger: logger.With().Str("component", "wiktionary_scraper").Logger(),
 	}
 
-	// Override the getBaseURL method for testing
-	originalGetBaseURL := api.getBaseURL
-	defer func() { api.getBaseURL = originalGetBaseURL }()
+	// Override the getBaseURL function for testing
 	api.getBaseURL = func(language string) string {
 		return server.URL
 	}
@@ -123,9 +117,7 @@ func TestFetchWord_RequestError(t *testing.T) {
 	logger := zerolog.New(zerolog.NewTestWriter(t))
 	api := NewWiktionaryAPI(logger)
 
-	// Override the getBaseURL method for testing
-	originalGetBaseURL := api.getBaseURL
-	defer func() { api.getBaseURL = originalGetBaseURL }()
+	// Override the getBaseURL function for testing
 	api.getBaseURL = func(language string) string {
 		return "http://invalid-url-that-will-fail"
 	}
@@ -167,9 +159,7 @@ func TestFetchWord_EmptyResponse(t *testing.T) {
 		logger: logger.With().Str("component", "wiktionary_scraper").Logger(),
 	}
 
-	// Override the getBaseURL method for testing
-	originalGetBaseURL := api.getBaseURL
-	defer func() { api.getBaseURL = originalGetBaseURL }()
+	// Override the getBaseURL function for testing
 	api.getBaseURL = func(language string) string {
 		return server.URL
 	}
