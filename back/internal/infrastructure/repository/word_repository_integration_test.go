@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -245,5 +247,138 @@ func TestWordRepository_Integration(t *testing.T) {
 		// Try to find by non-existent form
 		_, err = repo.FindByAnyForm(ctx, "nonexistentform", "en")
 		assert.ErrorIs(t, err, word.ErrWordNotFound)
+	})
+	
+	t.Run("UpdateExistingWord", func(t *testing.T) {
+		ctx := context.Background()
+
+		// Create and save initial word
+		testWord := createTestWord()
+		testWord.Text = "update-test"
+		
+		err := repo.Save(ctx, testWord)
+		require.NoError(t, err)
+		assert.NotEmpty(t, testWord.ID)
+		
+		originalID := testWord.ID
+		
+		// Modify the word
+		testWord.Definitions = append(testWord.Definitions, word.Definition{
+			Text:     "a second definition",
+			WordType: "verb",
+			Examples: []string{"to test something"},
+		})
+		testWord.Examples = append(testWord.Examples, "another example")
+		
+		// Save the updated word
+		err = repo.Save(ctx, testWord)
+		require.NoError(t, err)
+		
+		// ID should remain the same
+		assert.Equal(t, originalID, testWord.ID)
+		
+		// Retrieve the word and verify updates
+		updated, err := repo.FindByText(ctx, testWord.Text, testWord.Language)
+		require.NoError(t, err)
+		
+		assert.Equal(t, originalID, updated.ID)
+		assert.Len(t, updated.Definitions, 2)
+		assert.Equal(t, "a second definition", updated.Definitions[1].Text)
+		assert.Contains(t, updated.Examples, "another example")
+	})
+	
+	t.Run("ComplexFiltering", func(t *testing.T) {
+		ctx := context.Background()
+		
+		// Create words with different languages
+		enWord := createTestWord()
+		enWord.Text = "filter-test-en"
+		enWord.Language = "en"
+		
+		frWord := createTestWord()
+		frWord.Text = "filter-test-fr"
+		frWord.Language = "fr"
+		
+		esWord := createTestWord()
+		esWord.Text = "filter-test-es"
+		esWord.Language = "es"
+		
+		// Save all words
+		require.NoError(t, repo.Save(ctx, enWord))
+		require.NoError(t, repo.Save(ctx, frWord))
+		require.NoError(t, repo.Save(ctx, esWord))
+		
+		// Filter by language
+		filter := map[string]interface{}{"language": "fr"}
+		results, err := repo.List(ctx, filter, 10, 0)
+		require.NoError(t, err)
+		
+		// Should find at least the French word
+		found := false
+		for _, w := range results {
+			if w.Text == frWord.Text {
+				found = true
+				assert.Equal(t, "fr", w.Language)
+				break
+			}
+		}
+		assert.True(t, found, "French word should be found in results")
+		
+		// Should not find English or Spanish words in French results
+		for _, w := range results {
+			assert.NotEqual(t, enWord.Text, w.Text, "English word should not be in French results")
+			assert.NotEqual(t, esWord.Text, w.Text, "Spanish word should not be in French results")
+		}
+	})
+	
+	t.Run("ConcurrentOperations", func(t *testing.T) {
+		// Test concurrent operations on the repository
+		const numGoroutines = 5
+		const wordsPerGoroutine = 3
+		
+		var wg sync.WaitGroup
+		wg.Add(numGoroutines)
+		
+		for i := 0; i < numGoroutines; i++ {
+			go func(routineID int) {
+				defer wg.Done()
+				
+				for j := 0; j < wordsPerGoroutine; j++ {
+					ctx := context.Background()
+					
+					// Create a unique word for this goroutine
+					testWord := createTestWord()
+					testWord.Text = fmt.Sprintf("concurrent-test-%d-%d", routineID, j)
+					
+					// Save the word
+					err := repo.Save(ctx, testWord)
+					assert.NoError(t, err)
+					
+					// Find the word
+					found, err := repo.FindByText(ctx, testWord.Text, testWord.Language)
+					assert.NoError(t, err)
+					assert.Equal(t, testWord.Text, found.Text)
+				}
+			}(i)
+		}
+		
+		wg.Wait()
+		
+		// Verify we can find all the words
+		ctx := context.Background()
+		filter := map[string]interface{}{"language": "en"}
+		results, err := repo.List(ctx, filter, 100, 0)
+		require.NoError(t, err)
+		
+		// Count concurrent test words
+		concurrentWords := 0
+		for _, w := range results {
+			if strings.HasPrefix(w.Text, "concurrent-test-") {
+				concurrentWords++
+			}
+		}
+		
+		assert.Equal(t, numGoroutines*wordsPerGoroutine, concurrentWords, 
+			"Should find all concurrently created words")
 	})
 }
