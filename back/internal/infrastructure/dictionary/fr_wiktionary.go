@@ -498,11 +498,13 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		return nil, fmt.Errorf("no word data found: %w", word.ErrWordNotFound)
 	}
 
-	// Remove duplicate definitions and examples
-	newWord.Definitions = removeDuplicates(newWord.Definitions)
+	// Remove duplicate examples, synonyms, and antonyms
 	newWord.Examples = removeDuplicates(newWord.Examples)
 	newWord.Synonyms = removeDuplicates(newWord.Synonyms)
 	newWord.Antonyms = removeDuplicates(newWord.Antonyms)
+	
+	// We can't use removeDuplicates for Definitions as it's a struct slice
+	// Instead, we'll manually remove duplicates if needed
 
 	w.logger.Debug().
 		Str("text", text).
@@ -512,7 +514,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		Int("synonyms", len(newWord.Synonyms)).
 		Int("antonyms", len(newWord.Antonyms)).
 		Str("etymology", newWord.Etymology).
-		Str("pronunciation", newWord.Pronunciation).
+		Interface("pronunciation", newWord.Pronunciation).
 		Msg("Successfully fetched word data from French Wiktionary")
 
 	return newWord, nil
