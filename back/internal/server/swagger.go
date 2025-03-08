@@ -1,7 +1,8 @@
 package server
 
 import (
-	"path/filepath"
+	"io/fs"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -20,9 +21,33 @@ func (s *Server) setupSwagger() {
 		// Serve the Swagger UI with the specified URL
 		s.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
 
-		// Serve the swagger.yaml file
+		// Get the embedded swagger files
+		swaggerFS, err := fs.Sub(swaggerContent, "swagger_files")
+		if err != nil {
+			s.log.Error().Err(err).Msg("Failed to create sub-filesystem for swagger files")
+			return
+		}
+
+		// Serve the swagger.yaml file from embedded content
 		s.router.GET("/swagger.yaml", func(c *gin.Context) {
-			c.File(filepath.Join("api", "swagger.yaml"))
+			yamlContent, err := fs.ReadFile(swaggerFS, "swagger.yaml")
+			if err != nil {
+				s.log.Error().Err(err).Msg("Failed to read embedded swagger.yaml")
+				c.String(http.StatusInternalServerError, "Failed to read swagger.yaml")
+				return
+			}
+			c.Data(http.StatusOK, "application/yaml", yamlContent)
+		})
+		
+		// Serve the index.html file from embedded content
+		s.router.GET("/", func(c *gin.Context) {
+			htmlContent, err := fs.ReadFile(swaggerFS, "index.html")
+			if err != nil {
+				s.log.Error().Err(err).Msg("Failed to read embedded index.html")
+				c.String(http.StatusInternalServerError, "Failed to read index.html")
+				return
+			}
+			c.Data(http.StatusOK, "text/html", htmlContent)
 		})
 		
 		// Log Swagger UI URL
