@@ -144,12 +144,10 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 			return
 		}
 		
-		if newWord.Pronunciation == "" {
-			pronunciation := strings.TrimSpace(e.Text)
-			if strings.HasPrefix(pronunciation, "\\") && strings.HasSuffix(pronunciation, "\\") {
-				w.logger.Debug().Str("pronunciation", pronunciation).Msg("Found pronunciation")
-				newWord.Pronunciation = pronunciation
-			}
+		pronunciation := strings.TrimSpace(e.Text)
+		if strings.HasPrefix(pronunciation, "\\") && strings.HasSuffix(pronunciation, "\\") {
+			w.logger.Debug().Str("pronunciation", pronunciation).Msg("Found pronunciation")
+			newWord.SetPronunciation("ipa", pronunciation)
 		}
 	})
 	
@@ -204,21 +202,26 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		
 		if definitionList != nil {
 			// Process each list item as a definition
-			definitionList.DOM.Find("li").Each(func(i int, li *colly.Selection) {
+			definitionList.DOM.Find("li").Each(func(i int, liSelection *goquery.Selection) {
+				// Create a colly HTMLElement for the list item
+				li := &colly.HTMLElement{
+					DOM: liSelection,
+				}
+				
 				// Extract definition type if present
 				defType := ""
-				li.Find("span.emploi").Each(func(_ int, span *colly.Selection) {
-					defType = strings.TrimSpace(span.Text())
+				li.ForEach("span.emploi", func(_ int, span *colly.HTMLElement) {
+					defType = strings.TrimSpace(span.Text)
 					defType = strings.TrimPrefix(defType, "(")
 					defType = strings.TrimSuffix(defType, ")")
 				})
 				
-				// Get the main definition text
-				definitionText := strings.TrimSpace(li.Contents().Not("ul").Not("span.example").Text())
+				// Get the main definition text - need to use goquery for this
+				definitionText := strings.TrimSpace(liSelection.Contents().Not("ul").Not("span.example").Text())
 				
 				// If empty, try getting the full text and cleaning it
 				if definitionText == "" {
-					fullText := strings.TrimSpace(li.Text())
+					fullText := strings.TrimSpace(li.Text)
 					
 					// Try to separate definition from examples
 					if idx := strings.Index(fullText, " : "); idx > 0 {
@@ -247,8 +250,8 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
 				
 				// Extract examples
-				li.Find("span.example").Each(func(_ int, example *colly.Selection) {
-					exampleText := strings.TrimSpace(example.Text())
+				li.ForEach("span.example", func(_ int, example *colly.HTMLElement) {
+					exampleText := strings.TrimSpace(example.Text)
 					if exampleText != "" {
 						// Clean up the example text
 						exampleText = strings.ReplaceAll(exampleText, "« ", "")
@@ -274,8 +277,13 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		// Look for the unordered list that contains synonyms
 		synonymList := e.DOM.Parent().Parent().Next()
 		if synonymList.Is("ul") {
-			synonymList.Find("li").Each(func(_ int, li *colly.Selection) {
-				synonym := strings.TrimSpace(li.Text())
+			// Create a colly HTMLElement for the synonym list
+			synonymListElem := &colly.HTMLElement{
+				DOM: synonymList,
+			}
+			
+			synonymListElem.ForEach("li", func(_ int, li *colly.HTMLElement) {
+				synonym := strings.TrimSpace(li.Text)
 				if synonym != "" {
 					w.logger.Debug().Str("synonym", synonym).Msg("Found synonym")
 					newWord.Synonyms = append(newWord.Synonyms, synonym)
@@ -295,8 +303,13 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		// Look for the unordered list that contains antonyms
 		antonymList := e.DOM.Parent().Parent().Next()
 		if antonymList.Is("ul") {
-			antonymList.Find("li").Each(func(_ int, li *colly.Selection) {
-				antonym := strings.TrimSpace(li.Text())
+			// Create a colly HTMLElement for the antonym list
+			antonymListElem := &colly.HTMLElement{
+				DOM: antonymList,
+			}
+			
+			antonymListElem.ForEach("li", func(_ int, li *colly.HTMLElement) {
+				antonym := strings.TrimSpace(li.Text)
 				if antonym != "" {
 					w.logger.Debug().Str("antonym", antonym).Msg("Found antonym")
 					newWord.Antonyms = append(newWord.Antonyms, antonym)
@@ -316,23 +329,38 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		// Translations are in a complex structure, navigate to find them
 		translationsDiv := e.DOM.Parent().Parent().Next()
 		if translationsDiv.HasClass("boite") {
-			translationsDiv.Find("li").Each(func(_ int, li *colly.Selection) {
-				langSpan := li.Find("span[class^='trad-']").First()
+			// Create a colly HTMLElement for the translations div
+			translationsDivElem := &colly.HTMLElement{
+				DOM: translationsDiv,
+			}
+			
+			translationsDivElem.ForEach("li", func(_ int, li *colly.HTMLElement) {
+				// We need to use goquery for some operations
+				liSelection := li.DOM
+				
+				langSpan := liSelection.Find("span[class^='trad-']").First()
 				langName := strings.TrimSpace(langSpan.Text())
 				
-				// Extract the translation text
+				// Extract the translation text - need a different approach
 				translationText := ""
-				li.Contents().Each(func(i int, s *colly.Selection) {
-					if s.Get(0).Type == 1 { // Text node
-						text := strings.TrimSpace(s.Text())
-						if text != "" && text != ":" && !strings.HasPrefix(text, "Allemand") && 
-						   !strings.HasPrefix(text, "Anglais") && !strings.HasPrefix(text, "Espagnol") &&
-						   !strings.HasPrefix(text, "Italien") && !strings.HasPrefix(text, "Portugais") &&
-						   !strings.HasPrefix(text, "Roumain") {
-							translationText = text
-						}
+				
+				// Get the full text and try to extract the translation
+				fullText := strings.TrimSpace(li.Text)
+				
+				// Remove the language name and colon
+				for _, prefix := range []string{"Allemand", "Anglais", "Espagnol", "Italien", "Portugais", "Roumain"} {
+					if strings.HasPrefix(fullText, prefix) {
+						fullText = strings.TrimSpace(strings.TrimPrefix(fullText, prefix))
+						break
 					}
-				})
+				}
+				
+				// Remove the colon
+				fullText = strings.TrimSpace(strings.TrimPrefix(fullText, ":"))
+				
+				if fullText != "" {
+					translationText = fullText
+				}
 				
 				// Clean up the translation text
 				translationText = strings.TrimSpace(translationText)
