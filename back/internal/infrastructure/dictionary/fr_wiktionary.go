@@ -51,9 +51,30 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	var currentSection string
 	var inDefinitionList bool
 	var currentDefinitionIndex int
+	var inFrenchSection bool = false
+
+	// First, identify the French language section
+	c.OnHTML("h2", func(e *colly.HTMLElement) {
+		// Check if this is the French language section header
+		if e.ChildText("span.sectionlangue") == "Français" {
+			inFrenchSection = true
+			w.logger.Debug().Msg("Found French language section")
+		} else if e.ChildText("span.sectionlangue") != "" {
+			// If we find another language section after French, stop processing
+			if inFrenchSection {
+				inFrenchSection = false
+				w.logger.Debug().Msg("Exiting French language section")
+			}
+		}
+	})
 
 	// Extract etymology
 	c.OnHTML("div.mw-heading-3:has(span.titreetym) + dl", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
 		etymology := strings.TrimSpace(e.Text)
 		if etymology != "" {
 			w.logger.Debug().Str("etymology", etymology).Msg("Found etymology")
@@ -68,6 +89,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Extract word type (masculine/feminine) and plural form from the flextable
 	c.OnHTML("table.flextable-fr-mfsp, p span.ligne-de-forme", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
 		// Check if this is a table with plural information
 		if e.Name == "table" {
 			e.ForEach("tr", func(_ int, tr *colly.HTMLElement) {
@@ -94,6 +120,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Extract pronunciation
 	c.OnHTML("span.API", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
 		if newWord.Pronunciation == "" {
 			pronunciation := strings.TrimSpace(e.Text)
 			if strings.HasPrefix(pronunciation, "\\") && strings.HasSuffix(pronunciation, "\\") {
@@ -106,6 +137,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// Track sections to know when we're in definitions, synonyms, etc.
 	// Handle both div.mw-heading-3 and h3 elements that might contain section headings
 	c.OnHTML("div.mw-heading-3, h3", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
 		titleDef := e.ChildText("span.titredef")
 		if titleDef != "" {
 			w.logger.Debug().Str("section", titleDef).Msg("Found definition section")
@@ -126,6 +162,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Extract definition type from parentheses
 	c.OnHTML("li span.emploi", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
 		defType := strings.TrimSpace(e.Text)
 		// Clean up the definition type
 		defType = strings.TrimPrefix(defType, "(")
@@ -139,6 +180,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// Extract definitions from any ordered list following a definition heading
 	// This handles various HTML structures that might contain definitions
 	c.OnHTML("div.mw-heading-3:has(span.titredef) + p + ol, div.mw-heading-3:has(span.titredef) + ol, h3:has(span.titredef) + ol, h3:has(span.titredef) + p + ol", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
 		w.logger.Debug().Msg("Found definition list")
 		inDefinitionList = true
 		
@@ -199,6 +245,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	
 	// Backup method to extract definitions if the above selector doesn't work
 	c.OnHTML("ol", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
 		// Only process if we haven't found definitions yet and we're in a definition section
 		if !foundDefinitions && currentSection == "definitions" && !inDefinitionList {
 			w.logger.Debug().Msg("Using backup method to find definitions")
@@ -261,6 +312,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	
 	// Additional backup method to find definitions in paragraphs
 	c.OnHTML("div.mw-heading-3:has(span.titredef) ~ p, h3:has(span.titredef) ~ p", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
 		// Only process if we haven't found definitions yet
 		if !foundDefinitions {
 			definitionText := strings.TrimSpace(e.Text)
@@ -287,6 +343,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Extract synonyms
 	c.OnHTML("div.mw-heading-4:has(span.titresyno) + ul, h4:has(span.titresyno) + ul", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
 		e.ForEach("li", func(_ int, li *colly.HTMLElement) {
 			synonym := strings.TrimSpace(li.Text)
 			if synonym != "" {
