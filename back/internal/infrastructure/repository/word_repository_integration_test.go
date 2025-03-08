@@ -32,7 +32,7 @@ func setupTestDatabase(t *testing.T) (*pgxpool.Pool, func()) {
 			"POSTGRES_PASSWORD": "testpass",
 			"POSTGRES_DB":       "testdb",
 		},
-		WaitingFor: wait.ForLog("database system is ready to accept connections"),
+		WaitingFor: wait.ForHealthCheck(),
 	}
 
 	// Start container
