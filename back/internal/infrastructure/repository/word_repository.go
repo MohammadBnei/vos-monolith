@@ -14,14 +14,20 @@ import (
 	"voconsteroid/internal/domain/word"
 )
 
+// DBInterface defines the database operations needed by WordRepository
+type DBInterface interface {
+	QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row
+	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
+}
+
 // WordRepository implements the word.Repository interface using PostgreSQL
 type WordRepository struct {
-	db     *pgxpool.Pool
+	db     DBInterface
 	logger zerolog.Logger
 }
 
 // NewWordRepository creates a new word repository
-func NewWordRepository(db *pgxpool.Pool, logger zerolog.Logger) *WordRepository {
+func NewWordRepository(db DBInterface, logger zerolog.Logger) *WordRepository {
 	return &WordRepository{
 		db:     db,
 		logger: logger.With().Str("component", "word_repository").Logger(),

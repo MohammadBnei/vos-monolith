@@ -24,17 +24,8 @@ func setupMockDB(t *testing.T) (pgxmock.PgxPoolIface, *WordRepository) {
 
 	logger := zerolog.New(zerolog.NewTestWriter(t))
 	
-	// Create a type that satisfies both pgxpool.Pool and pgxmock.PgxPoolIface
-	// This is a workaround for the type mismatch
-	mockPool := &struct {
-		pgxmock.PgxPoolIface
-		*pgxpool.Pool
-	}{
-		PgxPoolIface: mock,
-	}
-	
 	repo := &WordRepository{
-		db:     mockPool,
+		db:     mock,
 		logger: logger.With().Str("component", "word_repository_test").Logger(),
 	}
 
