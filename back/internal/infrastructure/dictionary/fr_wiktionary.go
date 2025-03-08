@@ -120,6 +120,10 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					if plural != "" && plural != newWord.Text {
 						w.logger.Debug().Str("plural", plural).Msg("Found plural form")
 						newWord.Translations["plural"] = plural
+							
+						// Add this as a word form
+						pluralAttributes := map[string]string{"number": "plural"}
+						newWord.AddWordForm(plural, pluralAttributes, false)
 					}
 				})
 			}
@@ -136,6 +140,18 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if strings.Contains(wordType, "masculin") || strings.Contains(wordType, "féminin") {
 			w.logger.Debug().Str("wordType", wordType).Msg("Found word type")
 			newWord.Gender = wordType
+			
+			// If this is a form of another word, try to extract the lemma
+			if strings.Contains(wordType, "de ") {
+				parts := strings.Split(wordType, "de ")
+				if len(parts) > 1 {
+					lemma := strings.TrimSpace(parts[1])
+					if lemma != "" && lemma != newWord.Text {
+						w.logger.Debug().Str("lemma", lemma).Msg("Found lemma")
+						newWord.SetLemma(lemma)
+					}
+				}
+			}
 		}
 	})
 
@@ -170,6 +186,35 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if etymologyText != "" {
 			w.logger.Debug().Str("etymology", etymologyText).Msg("Found etymology")
 			newWord.Etymology = etymologyText
+		}
+	})
+	
+	// Extract usage notes
+	c.OnHTML("#Usages, #Usage_notes", func(e *colly.HTMLElement) {
+		if !inFrenchSection {
+			return
+		}
+		
+		w.logger.Debug().Msg("Found usage notes section")
+		
+		// Look for the content after the usage notes heading
+		nextElem := e.DOM.Parent().Next()
+		
+		// Try different possible formats for usage notes
+		if nextElem.Is("ul") {
+			nextElem.Find("li").Each(func(_ int, li *goquery.Selection) {
+				note := strings.TrimSpace(li.Text())
+				if note != "" {
+					w.logger.Debug().Str("usageNote", note).Msg("Found usage note")
+					newWord.AddUsageNote(note)
+				}
+			})
+		} else if nextElem.Is("p") {
+			note := strings.TrimSpace(nextElem.Text())
+			if note != "" {
+				w.logger.Debug().Str("usageNote", note).Msg("Found usage note")
+				newWord.AddUsageNote(note)
+			}
 		}
 	})
 
@@ -246,11 +291,8 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					definitionText = "(" + defType + ") " + definitionText
 				}
 
-				// Add the definition
-				newWord.Definitions = append(newWord.Definitions, definitionText)
-				w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
-
-				// Extract examples
+				// Collect examples for this definition
+				examples := []string{}
 				li.ForEach("span.example", func(_ int, example *colly.HTMLElement) {
 					exampleText := strings.TrimSpace(example.Text)
 					if exampleText != "" {
@@ -258,9 +300,13 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						exampleText = strings.ReplaceAll(exampleText, "« ", "")
 						exampleText = strings.ReplaceAll(exampleText, " »", "")
 						w.logger.Debug().Str("example", exampleText).Msg("Found example")
-						newWord.Examples = append(newWord.Examples, exampleText)
+						examples = append(examples, exampleText)
 					}
 				})
+				
+				// Add the definition using the entity method
+				newWord.AddDefinition(definitionText, "noun", examples)
+				w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
 
 				foundDefinitions = true
 			})
@@ -287,7 +333,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				synonym := strings.TrimSpace(li.Text)
 				if synonym != "" {
 					w.logger.Debug().Str("synonym", synonym).Msg("Found synonym")
-					newWord.Synonyms = append(newWord.Synonyms, synonym)
+					newWord.AddSynonym(synonym)
 				}
 			})
 		}
@@ -313,7 +359,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				antonym := strings.TrimSpace(li.Text)
 				if antonym != "" {
 					w.logger.Debug().Str("antonym", antonym).Msg("Found antonym")
-					newWord.Antonyms = append(newWord.Antonyms, antonym)
+					newWord.AddAntonym(antonym)
 				}
 			})
 		}
@@ -406,7 +452,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					definitionText := strings.TrimSpace(li.Text)
 					if definitionText != "" && len(definitionText) > 10 {
 						w.logger.Debug().Str("definition", definitionText).Msg("Found definition with fallback method")
-						newWord.Definitions = append(newWord.Definitions, definitionText)
+						newWord.AddDefinition(definitionText, "", []string{})
 						foundDefinitions = true
 					}
 				}
@@ -419,7 +465,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						fullText := strings.TrimSpace(p.Text)
 						if fullText != "" && len(fullText) > 10 && !strings.HasPrefix(fullText, "From") {
 							w.logger.Debug().Str("definition", fullText).Msg("Found definition in paragraph with fallback method")
-							newWord.Definitions = append(newWord.Definitions, fullText)
+							newWord.AddDefinition(fullText, "", []string{})
 							foundDefinitions = true
 						}
 					}
