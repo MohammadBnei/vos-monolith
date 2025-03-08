@@ -17,11 +17,6 @@ import (
 	"voconsteroid/internal/infrastructure/repository"
 )
 
-import (
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
-)
-
 // setupTestDatabase creates a PostgreSQL container and returns a connection pool
 func setupTestDatabase(t *testing.T) (*pgxpool.Pool, func()) {
 	t.Helper()
