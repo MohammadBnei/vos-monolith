@@ -13,3 +13,10 @@ go.work
 
 # Aider files
 .aider*
+
+# Environment variables
+.env
+
+# Docker volumes
+postgres_/
+redis_/

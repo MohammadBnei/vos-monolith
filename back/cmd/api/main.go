@@ -8,12 +8,19 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/joho/godotenv"
 	"voconsteroid/internal/config"
 	"voconsteroid/internal/server"
 	"voconsteroid/pkg/logger"
 )
 
 func main() {
+	// Load .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		// Only log this as info, not fatal, since .env is optional
+		log.Printf("No .env file found: %v", err)
+	}
+
 	if err := run(); err != nil {
 		log.Fatalf("Application failed: %v", err)
 	}

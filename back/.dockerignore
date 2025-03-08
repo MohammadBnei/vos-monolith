@@ -1,0 +1,19 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# IDE files
+.idea
+.vscode
+
+# Build artifacts
+bin/
+tmp/
+
+# Misc
+.DS_Store
+*.log
