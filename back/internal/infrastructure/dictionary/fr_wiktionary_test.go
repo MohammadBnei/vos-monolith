@@ -2,20 +2,14 @@ package dictionary
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
-	"github.com/gocolly/colly/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	wordDomain "voconsteroid/internal/domain/word"
@@ -73,7 +67,7 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 
 	// Check that we have definitions
 	assert.Greater(t, len(word.Definitions), 0, "Should have at least one definition")
-	
+
 	// Check the first definition
 	if len(word.Definitions) > 0 {
 		def := word.Definitions[0]
@@ -101,10 +95,10 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 
 	// Check that we have a plural form
 	assert.Contains(t, word.Translations, "plural", "Should have plural form in translations")
-	
+
 	// Check that we have word forms
 	assert.Greater(t, len(word.Forms), 0, "Should have at least one word form")
-	
+
 	// Check that the timestamps are set
 	assert.False(t, word.CreatedAt.IsZero(), "CreatedAt should be set")
 	assert.False(t, word.UpdatedAt.IsZero(), "UpdatedAt should be set")
@@ -202,7 +196,7 @@ func TestFrenchWiktionaryAPI_FetchRelatedWords(t *testing.T) {
 
 	// Test the FetchRelatedWords method
 	relatedWords, err := api.FetchRelatedWords(ctx, testWord)
-	
+
 	// We expect an error because the mock server doesn't return valid HTML
 	// but we should still get a RelatedWords object with minimal words
 	assert.Error(t, err)
@@ -210,7 +204,7 @@ func TestFrenchWiktionaryAPI_FetchRelatedWords(t *testing.T) {
 	assert.Equal(t, testWord, relatedWords.SourceWord)
 	assert.Len(t, relatedWords.Synonyms, 2)
 	assert.Len(t, relatedWords.Antonyms, 1)
-	
+
 	// Check that the minimal words were created correctly
 	assert.Equal(t, "synonym1", relatedWords.Synonyms[0].Text)
 	assert.Equal(t, "synonym2", relatedWords.Synonyms[1].Text)
@@ -280,7 +274,7 @@ func TestFrenchWiktionaryAPI_ExtractPageStructure(t *testing.T) {
 
 	// Test extractPageStructure
 	pageStructure, err := api.extractPageStructure(context.Background(), "test", "fr")
-	
+
 	// Verify the results
 	assert.NoError(t, err)
 	assert.True(t, pageStructure.HasFrenchSection)
@@ -313,7 +307,7 @@ func TestFrenchWiktionaryAPI_ExtractPageStructure_NoFrenchSection(t *testing.T) 
 
 	// Test extractPageStructure
 	pageStructure, err := api.extractPageStructure(context.Background(), "test", "fr")
-	
+
 	// Verify the results
 	assert.NoError(t, err)
 	assert.False(t, pageStructure.HasFrenchSection)
@@ -341,7 +335,7 @@ func TestFrenchWiktionaryAPI_ExtractPageStructure_FallbackToHeadings(t *testing.
 
 	// Test extractPageStructure
 	pageStructure, err := api.extractPageStructure(context.Background(), "test", "fr")
-	
+
 	// Verify the results
 	assert.NoError(t, err)
 	assert.True(t, pageStructure.HasFrenchSection)
@@ -443,7 +437,7 @@ func TestFrenchWiktionaryAPI_IntegrationTest_NoDefinitions(t *testing.T) {
 }
 func TestFrenchWiktionaryAPI_DetermineWordType(t *testing.T) {
 	api := &FrenchWiktionaryAPI{}
-	
+
 	testCases := []struct {
 		sectionTitle string
 		expectedType string
@@ -458,7 +452,7 @@ func TestFrenchWiktionaryAPI_DetermineWordType(t *testing.T) {
 		{"Interjection", "interjection"},
 		{"Unknown", ""},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.sectionTitle, func(t *testing.T) {
 			result := api.determineWordType(tc.sectionTitle)
@@ -468,7 +462,7 @@ func TestFrenchWiktionaryAPI_DetermineWordType(t *testing.T) {
 }
 func TestFrenchWiktionaryAPI_MapLanguageNameToCode(t *testing.T) {
 	api := &FrenchWiktionaryAPI{}
-	
+
 	testCases := []struct {
 		langName string
 		expected string
@@ -481,7 +475,7 @@ func TestFrenchWiktionaryAPI_MapLanguageNameToCode(t *testing.T) {
 		{"Roumain", "ro"},
 		{"Unknown", ""},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.langName, func(t *testing.T) {
 			result := api.mapLanguageNameToCode(tc.langName)
@@ -502,11 +496,20 @@ func TestContainsString(t *testing.T) {
 		{"string at beginning", []string{"test", "b", "c"}, "test", true},
 		{"string at end", []string{"a", "b", "test"}, "test", true},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := containsString(tc.slice, tc.str)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+func containsString(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }
