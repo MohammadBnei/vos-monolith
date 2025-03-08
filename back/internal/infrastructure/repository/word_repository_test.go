@@ -2,10 +2,10 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -84,7 +84,7 @@ func TestWordRepository_FindByText(t *testing.T) {
 	// Setup expected query and response
 	definitionsJSON := `[{"text":"a procedure intended to establish the quality, performance, or reliability of something","word_type":"noun","examples":["the car has passed its test"]}]`
 	formsJSON := `[{"text":"test","attributes":{"number":"singular"},"is_lemma":true},{"text":"tests","attributes":{"number":"plural"},"is_lemma":false}]`
-	
+
 	rows := pgxmock.NewRows([]string{
 		"id", "text", "language", "definitions", "examples", "pronunciation",
 		"etymology", "translations", "word_type", "forms", "search_terms",
@@ -170,7 +170,7 @@ func TestWordRepository_FindByAnyForm(t *testing.T) {
 	// Setup expected query and response
 	definitionsJSON := `[{"text":"a procedure intended to establish the quality, performance, or reliability of something","word_type":"noun","examples":["the car has passed its test"]}]`
 	formsJSON := `[{"text":"test","attributes":{"number":"singular"},"is_lemma":true},{"text":"tests","attributes":{"number":"plural"},"is_lemma":false}]`
-	
+
 	rows := pgxmock.NewRows([]string{
 		"id", "text", "language", "definitions", "examples", "pronunciation",
 		"etymology", "translations", "word_type", "forms", "search_terms",
@@ -285,7 +285,7 @@ func TestWordRepository_List(t *testing.T) {
 	// Setup expected query and response
 	definitionsJSON := `[{"text":"a procedure intended to establish the quality, performance, or reliability of something","word_type":"noun","examples":["the car has passed its test"]}]`
 	formsJSON := `[{"text":"test","attributes":{"number":"singular"},"is_lemma":true},{"text":"tests","attributes":{"number":"plural"},"is_lemma":false}]`
-	
+
 	rows := pgxmock.NewRows([]string{
 		"id", "text", "language", "definitions", "examples", "pronunciation",
 		"etymology", "translations", "word_type", "forms", "search_terms",
@@ -342,7 +342,7 @@ func TestWordRepository_List_WithOffset(t *testing.T) {
 	// Setup expected query and response
 	definitionsJSON := `[{"text":"a procedure intended to establish the quality, performance, or reliability of something","word_type":"noun","examples":["the car has passed its test"]}]`
 	formsJSON := `[{"text":"test","attributes":{"number":"singular"},"is_lemma":true},{"text":"tests","attributes":{"number":"plural"},"is_lemma":false}]`
-	
+
 	rows := pgxmock.NewRows([]string{
 		"id", "text", "language", "definitions", "examples", "pronunciation",
 		"etymology", "translations", "word_type", "forms", "search_terms",
