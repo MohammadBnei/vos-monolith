@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Voc on Steroid API
+  description: API for vocabulary learning and word lookup
+  version: 1.0.0
+  contact:
+    email: support@voconsteroid.com
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.voconsteroid.com
+    description: Production server
+tags:
+  - name: words
+    description: Operations about words
+  - name: health
+    description: Health check endpoints
+paths:
+  /api/v1/words/search:
+    post:
+      tags:
+        - words
+      summary: Search for a word
+      description: Search for a word by text and language, fetching from external API if needed
+      operationId: searchWord
+      requestBody:
+        description: Word search parameters
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WordSearchRequest'
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WordSearchResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Word not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/words/recent:
+    get:
+      tags:
+        - words
+      summary: Get recent words
+      description: Retrieve recently searched words
+      operationId: getRecentWords
+      parameters:
+        - name: language
+          in: query
+          description: Language code (e.g., en, fr, es)
+          required: false
+          schema:
+            type: string
+            default: en
+        - name: limit
+          in: query
+          description: Maximum number of words to return
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecentWordsResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /health:
+    get:
+      tags:
+        - health
+      summary: Health check
+      description: Check if the API is running
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  schemas:
+    Word:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the word
+        text:
+          type: string
+          description: The word text
+        language:
+          type: string
+          description: Language code (e.g., en, fr, es)
+        definitions:
+          type: array
+          items:
+            type: string
+          description: List of definitions
+        examples:
+          type: array
+          items:
+            type: string
+          description: List of usage examples
+        pronunciation:
+          type: string
+          description: Pronunciation guide
+        etymology:
+          type: string
+          description: Etymology information
+        translations:
+          type: object
+          additionalProperties:
+            type: string
+          description: Translations to other languages
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+      required:
+        - text
+        - language
+    WordSearchRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          description: The word to search for
+        language:
+          type: string
+          description: Language code (e.g., en, fr, es)
+      required:
+        - text
+        - language
+    WordSearchResponse:
+      type: object
+      properties:
+        word:
+          $ref: '#/components/schemas/Word'
+    RecentWordsResponse:
+      type: object
+      properties:
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/Word'
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+          description: HTTP status code
+        message:
+          type: string
+          description: Error message
+        error:
+          type: string
+          description: Error type
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Service status
+        app:
+          type: string
+          description: Application name

@@ -126,6 +126,9 @@ func (s *Server) setupRoutes() {
 	// Demo error endpoint
 	s.router.GET("/error", s.demoError)
 
+	// Setup Swagger documentation
+	s.setupSwagger()
+
 	// Word API routes
 	api := s.router.Group("/api/v1")
 	{
