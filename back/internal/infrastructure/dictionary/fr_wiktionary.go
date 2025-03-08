@@ -636,8 +636,8 @@ func (w *FrenchWiktionaryAPI) setupDefinitionsCallback(c *colly.Collector, word 
 
 				// Collect examples for this definition
 				examples := []string{}
-				li.ForEach("span.example", func(_ int, example *colly.HTMLElement) {
-					exampleText := strings.TrimSpace(example.Text)
+				liSelection.Find("span.example").Each(func(_ int, exampleSpan *goquery.Selection) {
+					exampleText := strings.TrimSpace(exampleSpan.Text())
 					if exampleText != "" {
 						// Clean up the example text
 						exampleText = strings.ReplaceAll(exampleText, "« ", "")
