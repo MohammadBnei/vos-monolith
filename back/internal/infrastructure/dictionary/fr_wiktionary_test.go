@@ -2,18 +2,42 @@ package dictionary
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
+	"github.com/gocolly/colly/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"voconsteroid/internal/domain/word"
+	wordDomain "voconsteroid/internal/domain/word"
 )
+
+// Helper function to create a test server with the given HTML content
+func createTestServer(html string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(html))
+	}))
+}
+
+// Helper function to create a test API with a custom base URL
+func createTestAPI(t *testing.T, baseURL string) *FrenchWiktionaryAPI {
+	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+	api := NewFrenchWiktionaryAPI(logger)
+	api.getBaseURL = func(language string) string {
+		return baseURL
+	}
+	return api
+}
 
 func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 	// Load test HTML
@@ -157,5 +181,332 @@ func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
 	_, err := api.FetchWord(context.Background(), "test", "fr")
 	assert.Error(t, err, "Should return error for empty HTML")
 	assert.Contains(t, err.Error(), "no word data found", "Error should be about no word data found")
-	assert.ErrorIs(t, err, word.ErrWordNotFound, "Error should be ErrWordNotFound")
+	assert.ErrorIs(t, err, wordDomain.ErrWordNotFound, "Error should be ErrWordNotFound")
+}
+func TestFrenchWiktionaryAPI_FetchRelatedWords(t *testing.T) {
+	// Create a test server with a simple HTML response
+	server := createTestServer("<html><body>Test page</body></html>")
+	defer server.Close()
+
+	// Create a mock word with synonyms and antonyms
+	testWord := wordDomain.NewWord("test", "fr")
+	testWord.AddSynonym("synonym1")
+	testWord.AddSynonym("synonym2")
+	testWord.AddAntonym("antonym1")
+
+	// Create a test API with a mocked FetchWord method
+	api := createTestAPI(t, server.URL)
+
+	// Create a context
+	ctx := context.Background()
+
+	// Test the FetchRelatedWords method
+	relatedWords, err := api.FetchRelatedWords(ctx, testWord)
+	
+	// We expect an error because the mock server doesn't return valid HTML
+	// but we should still get a RelatedWords object with minimal words
+	assert.Error(t, err)
+	require.NotNil(t, relatedWords)
+	assert.Equal(t, testWord, relatedWords.SourceWord)
+	assert.Len(t, relatedWords.Synonyms, 2)
+	assert.Len(t, relatedWords.Antonyms, 1)
+	
+	// Check that the minimal words were created correctly
+	assert.Equal(t, "synonym1", relatedWords.Synonyms[0].Text)
+	assert.Equal(t, "synonym2", relatedWords.Synonyms[1].Text)
+	assert.Equal(t, "antonym1", relatedWords.Antonyms[0].Text)
+}
+
+func TestFrenchWiktionaryAPI_FetchRelatedWords_ContextCancellation(t *testing.T) {
+	// Create a test server
+	server := createTestServer("<html><body>Test page</body></html>")
+	defer server.Close()
+
+	// Create a test word
+	testWord := wordDomain.NewWord("test", "fr")
+	testWord.AddSynonym("synonym1")
+	testWord.AddAntonym("antonym1")
+
+	// Create a test API
+	api := createTestAPI(t, server.URL)
+
+	// Create a cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	// Test the FetchRelatedWords method with a cancelled context
+	_, err := api.FetchRelatedWords(ctx, testWord)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context canceled")
+}
+func TestFrenchWiktionaryAPI_ExtractPageStructure(t *testing.T) {
+	// Create HTML with a table of contents
+	html := `
+	<html>
+		<body>
+			<div id="mw-panel-toc-list">
+				<li id="toc-Français">
+					<span class="vector-toc-text"><span>Français</span></span>
+					<ul>
+						<li id="toc-Nom_commun">
+							<span class="vector-toc-text"><span>Nom commun</span></span>
+							<ul>
+								<li id="toc-Synonymes">
+									<span class="vector-toc-text"><span>Synonymes</span></span>
+								</li>
+								<li id="toc-Antonymes">
+									<span class="vector-toc-text"><span>Antonymes</span></span>
+								</li>
+							</ul>
+						</li>
+						<li id="toc-Étymologie">
+							<span class="vector-toc-text"><span>Étymologie</span></span>
+						</li>
+						<li id="toc-Prononciation">
+							<span class="vector-toc-text"><span>Prononciation</span></span>
+						</li>
+					</ul>
+				</li>
+			</div>
+		</body>
+	</html>`
+
+	// Create a test server
+	server := createTestServer(html)
+	defer server.Close()
+
+	// Create a test API
+	api := createTestAPI(t, server.URL)
+
+	// Test extractPageStructure
+	pageStructure, err := api.extractPageStructure(context.Background(), "test", "fr")
+	
+	// Verify the results
+	assert.NoError(t, err)
+	assert.True(t, pageStructure.HasFrenchSection)
+	assert.Contains(t, pageStructure.WordTypeSections, "Nom commun")
+	assert.Contains(t, pageStructure.OtherSections, "etymology")
+	assert.Contains(t, pageStructure.OtherSections, "pronunciation")
+	assert.Contains(t, pageStructure.OtherSections, "synonyms")
+	assert.Contains(t, pageStructure.OtherSections, "antonyms")
+}
+
+func TestFrenchWiktionaryAPI_ExtractPageStructure_NoFrenchSection(t *testing.T) {
+	// Create HTML without a French section
+	html := `
+	<html>
+		<body>
+			<div id="mw-panel-toc-list">
+				<li id="toc-English">
+					<span class="vector-toc-text"><span>English</span></span>
+				</li>
+			</div>
+		</body>
+	</html>`
+
+	// Create a test server
+	server := createTestServer(html)
+	defer server.Close()
+
+	// Create a test API
+	api := createTestAPI(t, server.URL)
+
+	// Test extractPageStructure
+	pageStructure, err := api.extractPageStructure(context.Background(), "test", "fr")
+	
+	// Verify the results
+	assert.NoError(t, err)
+	assert.False(t, pageStructure.HasFrenchSection)
+	assert.Empty(t, pageStructure.WordTypeSections)
+	assert.Empty(t, pageStructure.OtherSections)
+}
+
+func TestFrenchWiktionaryAPI_ExtractPageStructure_FallbackToHeadings(t *testing.T) {
+	// Create HTML with headings but no TOC
+	html := `
+	<html>
+		<body>
+			<h2 id="Français">Français</h2>
+			<h3 id="Nom_commun">Nom commun</h3>
+			<h4 id="Synonymes">Synonymes</h4>
+		</body>
+	</html>`
+
+	// Create a test server
+	server := createTestServer(html)
+	defer server.Close()
+
+	// Create a test API
+	api := createTestAPI(t, server.URL)
+
+	// Test extractPageStructure
+	pageStructure, err := api.extractPageStructure(context.Background(), "test", "fr")
+	
+	// Verify the results
+	assert.NoError(t, err)
+	assert.True(t, pageStructure.HasFrenchSection)
+	assert.Contains(t, pageStructure.WordTypeSections, "Nom commun")
+	assert.Contains(t, pageStructure.OtherSections, "synonyms")
+}
+func TestFrenchWiktionaryAPI_IntegrationTest(t *testing.T) {
+	// Load test HTML
+	html, err := os.ReadFile("fr_wiktionary_test.html")
+	if err != nil {
+		t.Fatalf("Failed to read test HTML file: %v", err)
+	}
+
+	// Create a test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write(html)
+	}))
+	defer server.Close()
+
+	// Create a logger
+	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+
+	// Create a French Wiktionary API with a custom getBaseURL function
+	api := NewFrenchWiktionaryAPI(logger)
+	api.getBaseURL = func(language string) string {
+		return server.URL
+	}
+
+	// Test the full process
+	// 1. Extract page structure
+	pageStructure, err := api.extractPageStructure(context.Background(), "test", "fr")
+	assert.NoError(t, err)
+	assert.True(t, pageStructure.HasFrenchSection)
+	assert.Contains(t, pageStructure.WordTypeSections, "Nom commun")
+	assert.Contains(t, pageStructure.OtherSections, "etymology")
+	assert.Contains(t, pageStructure.OtherSections, "pronunciation")
+	assert.Contains(t, pageStructure.OtherSections, "synonyms")
+	assert.Contains(t, pageStructure.OtherSections, "antonyms")
+	assert.Contains(t, pageStructure.OtherSections, "translations")
+
+	// 2. Extract word information
+	word := wordDomain.NewWord("test", "fr")
+	foundDefinitions, err := api.extractWordInformation(context.Background(), word, pageStructure, "test", "fr")
+	assert.NoError(t, err)
+	assert.True(t, foundDefinitions)
+
+	// 3. Verify the extracted information
+	assert.Greater(t, len(word.Definitions), 0, "Should have at least one definition")
+	assert.Greater(t, len(word.Examples), 0, "Should have at least one example")
+	assert.Greater(t, len(word.Synonyms), 0, "Should have at least one synonym")
+	assert.Greater(t, len(word.Antonyms), 0, "Should have at least one antonym")
+	assert.NotEmpty(t, word.Etymology, "Should have etymology")
+	assert.NotEmpty(t, word.Pronunciation, "Should have pronunciation")
+	assert.Contains(t, word.Translations, "plural", "Should have plural form")
+}
+
+func TestFrenchWiktionaryAPI_IntegrationTest_NoDefinitions(t *testing.T) {
+	// Create HTML without definitions
+	html := `
+	<html>
+		<body>
+			<div id="mw-panel-toc-list">
+				<li id="toc-Français">
+					<span class="vector-toc-text"><span>Français</span></span>
+					<ul>
+						<li id="toc-Nom_commun">
+							<span class="vector-toc-text"><span>Nom commun</span></span>
+						</li>
+					</ul>
+				</li>
+			</div>
+			<h2 id="Français">Français</h2>
+			<h3 id="Nom_commun">Nom commun</h3>
+			<p>Pas de définition</p>
+		</body>
+	</html>`
+
+	// Create a test server
+	server := createTestServer(html)
+	defer server.Close()
+
+	// Create a test API
+	api := createTestAPI(t, server.URL)
+
+	// Test the full process
+	// 1. Extract page structure
+	pageStructure, err := api.extractPageStructure(context.Background(), "test", "fr")
+	assert.NoError(t, err)
+	assert.True(t, pageStructure.HasFrenchSection)
+	assert.Contains(t, pageStructure.WordTypeSections, "Nom commun")
+
+	// 2. Extract word information
+	word := wordDomain.NewWord("test", "fr")
+	foundDefinitions, err := api.extractWordInformation(context.Background(), word, pageStructure, "test", "fr")
+	assert.NoError(t, err)
+	assert.False(t, foundDefinitions)
+	assert.Empty(t, word.Definitions)
+}
+func TestFrenchWiktionaryAPI_DetermineWordType(t *testing.T) {
+	api := &FrenchWiktionaryAPI{}
+	
+	testCases := []struct {
+		sectionTitle string
+		expectedType string
+	}{
+		{"Nom commun", "noun"},
+		{"Verbe", "verb"},
+		{"Adjectif", "adjective"},
+		{"Adverbe", "adverb"},
+		{"Pronom", "pronoun"},
+		{"Préposition", "preposition"},
+		{"Conjonction", "conjunction"},
+		{"Interjection", "interjection"},
+		{"Unknown", ""},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.sectionTitle, func(t *testing.T) {
+			result := api.determineWordType(tc.sectionTitle)
+			assert.Equal(t, tc.expectedType, result)
+		})
+	}
+}
+func TestFrenchWiktionaryAPI_MapLanguageNameToCode(t *testing.T) {
+	api := &FrenchWiktionaryAPI{}
+	
+	testCases := []struct {
+		langName string
+		expected string
+	}{
+		{"Allemand", "de"},
+		{"Anglais", "en"},
+		{"Espagnol", "es"},
+		{"Italien", "it"},
+		{"Portugais", "pt"},
+		{"Roumain", "ro"},
+		{"Unknown", ""},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.langName, func(t *testing.T) {
+			result := api.mapLanguageNameToCode(tc.langName)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+func TestContainsString(t *testing.T) {
+	testCases := []struct {
+		name     string
+		slice    []string
+		str      string
+		expected bool
+	}{
+		{"empty slice", []string{}, "test", false},
+		{"string not in slice", []string{"a", "b", "c"}, "test", false},
+		{"string in slice", []string{"a", "test", "c"}, "test", true},
+		{"string at beginning", []string{"test", "b", "c"}, "test", true},
+		{"string at end", []string{"a", "b", "test"}, "test", true},
+	}
+	
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := containsString(tc.slice, tc.str)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
 }
