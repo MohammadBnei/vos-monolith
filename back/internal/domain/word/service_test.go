@@ -68,9 +68,9 @@ func setupTestService(t *testing.T) (*MockRepository, *MockDictionaryAPI, Servic
 	repo := new(MockRepository)
 	dictAPI := new(MockDictionaryAPI)
 	logger := zerolog.New(zerolog.NewTestWriter(t))
-	
+
 	svc := NewService(repo, dictAPI, logger)
-	
+
 	return repo, dictAPI, svc
 }
 
@@ -80,8 +80,8 @@ func TestSearch_ExistingWord(t *testing.T) {
 
 	ctx := context.Background()
 	expectedWord := &Word{
-		Text:     "test",
-		Language: "en",
+		Text:      "test",
+		Language:  "en",
 		CreatedAt: time.Now(),
 	}
 
@@ -104,17 +104,17 @@ func TestSearch_NewWord(t *testing.T) {
 
 	ctx := context.Background()
 	expectedWord := &Word{
-		Text:     "test",
-		Language: "en",
+		Text:      "test",
+		Language:  "en",
 		CreatedAt: time.Now(),
 	}
 
 	// Expect repository to not find the word
 	repo.On("FindByText", ctx, "test", "en").Return(nil, errors.New("not found"))
-	
+
 	// Expect dictionary API to fetch the word
 	dictAPI.On("FetchWord", ctx, "test", "en").Return(expectedWord, nil)
-	
+
 	// Expect repository to save the word
 	repo.On("Save", ctx, expectedWord).Return(nil)
 
@@ -154,7 +154,7 @@ func TestSearch_APIError(t *testing.T) {
 
 	// Expect repository to not find the word
 	repo.On("FindByText", ctx, "test", "en").Return(nil, errors.New("not found"))
-	
+
 	// Expect dictionary API to return an error
 	dictAPI.On("FetchWord", ctx, "test", "en").Return(nil, apiErr)
 

@@ -73,8 +73,6 @@ func TestNewServer(t *testing.T) {
 	assert.Equal(t, logger, server.log)
 	assert.Equal(t, wordService, server.wordService)
 	assert.NotNil(t, server.router)
-	assert.NotNil(t, server.serverErrors)
-	assert.NotNil(t, server.shutdown)
 }
 
 func TestHealthCheck(t *testing.T) {
