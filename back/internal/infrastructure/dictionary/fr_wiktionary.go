@@ -10,12 +10,7 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/rs/zerolog"
 
-	"voconsteroid/internal/domain/word"
-)
-
-// Import the Definition type
-import (
-	. "voconsteroid/internal/domain/word"
+	wordDomain "voconsteroid/internal/domain/word"
 )
 
 // FrenchWiktionaryAPI implements the word.DictionaryAPI interface for French Wiktionary
@@ -35,22 +30,22 @@ func NewFrenchWiktionaryAPI(logger zerolog.Logger) *FrenchWiktionaryAPI {
 }
 
 // FetchRelatedWords retrieves words related to the given word from French Wiktionary
-func (w *FrenchWiktionaryAPI) FetchRelatedWords(ctx context.Context, word *word.Word) (*word.RelatedWords, error) {
+func (w *FrenchWiktionaryAPI) FetchRelatedWords(ctx context.Context, word *wordDomain.Word) (*wordDomain.RelatedWords, error) {
 	w.logger.Debug().Str("word", word.Text).Str("language", word.Language).Msg("Fetching related words from French Wiktionary")
-	
+
 	// Create a new RelatedWords object with the source word
-	relatedWords := &word.RelatedWords{
+	relatedWords := &wordDomain.RelatedWords{
 		SourceWord: word,
-		Synonyms:   []*word.Word{},
-		Antonyms:   []*word.Word{},
+		Synonyms:   []*wordDomain.Word{},
+		Antonyms:   []*wordDomain.Word{},
 	}
-	
+
 	// If the word already has synonyms or antonyms, fetch them
 	for _, synonym := range word.Synonyms {
 		if synonym == "" {
 			continue
 		}
-		
+
 		// Check context cancellation
 		select {
 		case <-ctx.Done():
@@ -62,18 +57,18 @@ func (w *FrenchWiktionaryAPI) FetchRelatedWords(ctx context.Context, word *word.
 				relatedWords.Synonyms = append(relatedWords.Synonyms, synonymWord)
 			} else {
 				// If we can't fetch the full word, create a minimal one
-				minimalWord := word.NewWord(synonym, word.Language)
+				minimalWord := wordDomain.NewWord(synonym, word.Language)
 				relatedWords.Synonyms = append(relatedWords.Synonyms, minimalWord)
 			}
 		}
 	}
-	
+
 	// Do the same for antonyms
 	for _, antonym := range word.Antonyms {
 		if antonym == "" {
 			continue
 		}
-		
+
 		// Check context cancellation
 		select {
 		case <-ctx.Done():
@@ -85,23 +80,23 @@ func (w *FrenchWiktionaryAPI) FetchRelatedWords(ctx context.Context, word *word.
 				relatedWords.Antonyms = append(relatedWords.Antonyms, antonymWord)
 			} else {
 				// If we can't fetch the full word, create a minimal one
-				minimalWord := word.NewWord(antonym, word.Language)
+				minimalWord := wordDomain.NewWord(antonym, word.Language)
 				relatedWords.Antonyms = append(relatedWords.Antonyms, minimalWord)
 			}
 		}
 	}
-	
+
 	w.logger.Debug().
 		Str("word", word.Text).
 		Int("synonyms", len(relatedWords.Synonyms)).
 		Int("antonyms", len(relatedWords.Antonyms)).
 		Msg("Successfully fetched related words")
-	
+
 	return relatedWords, nil
 }
 
 // FetchWord retrieves word information from French Wiktionary by scraping the web page
-func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*word.Word, error) {
+func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*wordDomain.Word, error) {
 	w.logger.Debug().Str("text", text).Str("language", language).Msg("Fetching word from French Wiktionary")
 
 	// Create a new collector
@@ -114,7 +109,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	c.SetRequestTimeout(10 * time.Second)
 
 	// Create a new word
-	newWord := word.NewWord(text, language)
+	newWord := wordDomain.NewWord(text, language)
 
 	// Track if we found any definitions
 	foundDefinitions := false
@@ -377,7 +372,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				})
 
 				// Add the definition using the entity method
-				newWord.Definitions = append(newWord.Definitions, Definition{
+				newWord.Definitions = append(newWord.Definitions, wordDomain.Definition{
 					Text:     definitionText,
 					WordType: "noun",
 					Examples: examples,
@@ -528,7 +523,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					definitionText := strings.TrimSpace(li.Text)
 					if definitionText != "" && len(definitionText) > 10 {
 						w.logger.Debug().Str("definition", definitionText).Msg("Found definition with fallback method")
-						newWord.Definitions = append(newWord.Definitions, Definition{
+						newWord.Definitions = append(newWord.Definitions, wordDomain.Definition{
 							Text:     definitionText,
 							WordType: "",
 							Examples: []string{},
@@ -545,7 +540,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						fullText := strings.TrimSpace(p.Text)
 						if fullText != "" && len(fullText) > 10 && !strings.HasPrefix(fullText, "From") {
 							w.logger.Debug().Str("definition", fullText).Msg("Found definition in paragraph with fallback method")
-							newWord.Definitions = append(newWord.Definitions, Definition{
+							newWord.Definitions = append(newWord.Definitions, wordDomain.Definition{
 								Text:     fullText,
 								WordType: "",
 								Examples: []string{},
@@ -581,14 +576,14 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// If still no definitions, return error
 	if len(newWord.Definitions) == 0 {
 		w.logger.Warn().Str("text", text).Str("language", language).Msg("No word data found")
-		return nil, fmt.Errorf("no word data found: %w", word.ErrWordNotFound)
+		return nil, fmt.Errorf("no word data found: %w", wordDomain.ErrWordNotFound)
 	}
 
 	// Remove duplicate examples, synonyms, and antonyms
 	newWord.Examples = removeDuplicates(newWord.Examples)
 	newWord.Synonyms = removeDuplicates(newWord.Synonyms)
 	newWord.Antonyms = removeDuplicates(newWord.Antonyms)
-	
+
 	// We can't use removeDuplicates for Definitions as it's a struct slice
 	// Instead, we'll manually remove duplicates if needed
 

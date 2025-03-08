@@ -5,7 +5,7 @@ DATABASE_URL ?= postgres://user:password@localhost:5432/voconsteroid?sslmode=dis
 
 .PHONY: run
 run: ## Run the application with air for live reload
-	air
+	go run ./cmd/api/main.go
 
 .PHONY: build
 build: ## Build the application
