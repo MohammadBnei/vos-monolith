@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog"
 
 	"voconsteroid/internal/config"
-	"voconsteroid/pkg/logger"
 )
 
 type Server struct {
 	cfg    *config.Config
-	log    logger.Logger
+	log    zerolog.Logger
 	router *gin.Engine
 
 	srv *http.Server
@@ -25,7 +25,7 @@ type Server struct {
 	shutdown     chan struct{}
 }
 
-func NewServer(cfg *config.Config, log logger.Logger) *Server {
+func NewServer(cfg *config.Config, log zerolog.Logger) *Server {
 
 	return &Server{
 		cfg:    cfg,
@@ -115,7 +115,7 @@ func (s *Server) loggerMiddleware() gin.HandlerFunc {
 
 func (s *Server) healthCheck(c *gin.Context) {
 	// Get logger from context
-	log := c.MustGet("logger").(logger.Logger)
+	log := c.MustGet("logger").(zerolog.Logger)
 
 	log.Debug().Msg("Health check request")
 	c.JSON(200, gin.H{

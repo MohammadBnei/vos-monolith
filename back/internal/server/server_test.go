@@ -14,46 +14,6 @@ import (
 	"voconsteroid/internal/config"
 )
 
-// MockLogger is a mock implementation of logger.Logger
-type MockLogger struct {
-	mock.Mock
-}
-
-func (m *MockLogger) Debug() *zerolog.Event {
-	args := m.Called()
-	return args.Get(0).(*zerolog.Event)
-}
-
-func (m *MockLogger) Info() *zerolog.Event {
-	args := m.Called()
-	return args.Get(0).(*zerolog.Event)
-}
-
-func (m *MockLogger) Warn() *zerolog.Event {
-	args := m.Called()
-	return args.Get(0).(*zerolog.Event)
-}
-
-func (m *MockLogger) Error() *zerolog.Event {
-	args := m.Called()
-	return args.Get(0).(*zerolog.Event)
-}
-
-func (m *MockLogger) Fatal() *zerolog.Event {
-	args := m.Called()
-	return args.Get(0).(*zerolog.Event)
-}
-
-func (m *MockLogger) Panic() *zerolog.Event {
-	args := m.Called()
-	return args.Get(0).(*zerolog.Event)
-}
-
-func (m *MockLogger) With() zerolog.Context {
-	args := m.Called()
-	return args.Get(0).(zerolog.Context)
-}
-
 // MockEvent is a mock implementation of zerolog.Event
 type MockEvent struct {
 	mock.Mock
@@ -79,13 +39,13 @@ func TestNewServer(t *testing.T) {
 		HTTPPort: "8080",
 	}
 
-	mockLogger := new(MockLogger)
+	logger := zerolog.New(zerolog.NewTestWriter())
 
-	server := NewServer(cfg, mockLogger)
+	server := NewServer(cfg, logger)
 
 	assert.NotNil(t, server)
 	assert.Equal(t, cfg, server.cfg)
-	assert.Equal(t, mockLogger, server.log)
+	assert.Equal(t, logger, server.log)
 	assert.NotNil(t, server.router)
 	assert.NotNil(t, server.serverErrors)
 	assert.NotNil(t, server.shutdown)
@@ -100,15 +60,12 @@ func TestHealthCheck(t *testing.T) {
 		HTTPPort: "8080",
 	}
 
-	mockLogger := new(MockLogger)
-	mockEvent := new(MockEvent)
-
-	// Setup expectations
-	mockLogger.On("Debug").Return(mockEvent)
-	mockEvent.On("Msg", "Health check request").Return()
+	// Create a test writer to capture log output
+	testWriter := zerolog.NewTestWriter()
+	logger := zerolog.New(testWriter)
 
 	// Create server
-	server := NewServer(cfg, mockLogger)
+	server := NewServer(cfg, logger)
 	server.setupRoutes()
 
 	// Create a test request
@@ -118,7 +75,7 @@ func TestHealthCheck(t *testing.T) {
 	// Create a gin context with the logger
 	c, _ := gin.CreateTestContext(w)
 	c.Request = req
-	c.Set("logger", mockLogger)
+	c.Set("logger", logger)
 
 	// Call the health check handler
 	server.healthCheck(c)
@@ -133,9 +90,8 @@ func TestHealthCheck(t *testing.T) {
 	assert.Equal(t, "ok", response["status"])
 	assert.Equal(t, "Test App", response["app"])
 
-	// Verify mock expectations
-	mockLogger.AssertExpectations(t)
-	mockEvent.AssertExpectations(t)
+	// Verify log output contains our message
+	assert.Contains(t, testWriter.String(), "Health check request")
 }
 
 func TestLoggerMiddleware(t *testing.T) {
@@ -147,19 +103,12 @@ func TestLoggerMiddleware(t *testing.T) {
 		HTTPPort: "8080",
 	}
 
-	mockLogger := new(MockLogger)
-	mockEvent := new(MockEvent)
-
-	// Setup expectations for request start
-	mockLogger.On("Debug").Return(mockEvent).Times(2)
-	mockEvent.On("Str", "method", "GET").Return(mockEvent).Times(2)
-	mockEvent.On("Str", "path", "/test").Return(mockEvent).Times(2)
-	mockEvent.On("Int", "status", 200).Return(mockEvent).Once()
-	mockEvent.On("Msg", "Request started").Return().Once()
-	mockEvent.On("Msg", "Request completed").Return().Once()
+	// Create a test writer to capture log output
+	testWriter := zerolog.NewTestWriter()
+	logger := zerolog.New(testWriter)
 
 	// Create server
-	server := NewServer(cfg, mockLogger)
+	server := NewServer(cfg, logger)
 
 	// Create a test request
 	w := httptest.NewRecorder()
@@ -175,11 +124,14 @@ func TestLoggerMiddleware(t *testing.T) {
 	middleware(c)
 
 	// Assert that logger was added to context
-	logger, exists := c.Get("logger")
+	contextLogger, exists := c.Get("logger")
 	assert.True(t, exists)
-	assert.Equal(t, mockLogger, logger)
+	assert.Equal(t, logger, contextLogger)
 
-	// Verify mock expectations
-	mockLogger.AssertExpectations(t)
-	mockEvent.AssertExpectations(t)
+	// Verify log output contains our messages
+	logOutput := testWriter.String()
+	assert.Contains(t, logOutput, "Request started")
+	assert.Contains(t, logOutput, "Request completed")
+	assert.Contains(t, logOutput, "GET")
+	assert.Contains(t, logOutput, "/test")
 }
