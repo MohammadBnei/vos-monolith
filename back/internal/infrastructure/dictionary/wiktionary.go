@@ -33,6 +33,8 @@ func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
 
 // FetchWord retrieves word information from Wiktionary
 func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*word.Word, error) {
+	w.logger.Debug().Str("text", text).Str("language", language).Msg("Fetching word from Wiktionary")
+	
 	// Build URL for the API request
 	url := fmt.Sprintf("%s?action=query&format=json&prop=extracts|translations|pronunciation&titles=%s",
 		w.baseURL, text)
@@ -40,29 +42,44 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 	// Create request with context
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
+		w.logger.Error().Err(err).Str("url", url).Msg("Failed to create request")
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Execute request
 	resp, err := w.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
+		w.logger.Error().Err(err).Str("url", url).Msg("Failed to send request")
+		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		w.logger.Error().Int("status", resp.StatusCode).Str("url", url).Msg("Received non-200 response")
+		return nil, fmt.Errorf("received non-200 response: %d", resp.StatusCode)
 	}
 
 	// Parse response
 	var response wiktionaryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		w.logger.Error().Err(err).Msg("Failed to parse response")
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	// Process response
 	newWord := word.NewWord(text, language)
+	
+	// Ensure maps and slices are initialized
+	if newWord.Definitions == nil {
+		newWord.Definitions = []string{}
+	}
+	if newWord.Examples == nil {
+		newWord.Examples = []string{}
+	}
+	if newWord.Translations == nil {
+		newWord.Translations = make(map[string]string)
+	}
 
 	// Extract data from response
 	for _, page := range response.Query.Pages {
@@ -93,9 +110,17 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 
 	// If no definitions were found, return an error
 	if len(newWord.Definitions) == 0 {
-		return nil, word.ErrWordNotFound
+		w.logger.Warn().Str("text", text).Str("language", language).Msg("No word data found")
+		return nil, fmt.Errorf("no word data found: %w", word.ErrWordNotFound)
 	}
 
+	w.logger.Debug().
+		Str("text", text).
+		Str("language", language).
+		Int("definitions", len(newWord.Definitions)).
+		Int("translations", len(newWord.Translations)).
+		Msg("Successfully fetched word data")
+		
 	return newWord, nil
 }
 

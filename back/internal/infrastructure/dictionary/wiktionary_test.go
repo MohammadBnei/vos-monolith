@@ -65,8 +65,19 @@ func TestFetchWord_Success(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Equal(t, "test", result.Text)
 	assert.Equal(t, "en", result.Language)
-	assert.Contains(t, result.Definitions[0], "procedure intended to establish")
+	
+	// Check if Definitions slice exists and has elements before accessing
+	assert.NotNil(t, result.Definitions)
+	if len(result.Definitions) > 0 {
+		assert.Contains(t, result.Definitions[0], "procedure intended to establish")
+	} else {
+		assert.Fail(t, "Expected definitions to be populated")
+	}
+	
 	assert.Equal(t, "tɛst", result.Pronunciation)
+	
+	// Check if Translations map exists before accessing
+	assert.NotNil(t, result.Translations)
 	assert.Equal(t, "test", result.Translations["fr"])
 	assert.Equal(t, "prueba", result.Translations["es"])
 }
