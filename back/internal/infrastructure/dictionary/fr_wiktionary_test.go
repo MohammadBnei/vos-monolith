@@ -39,25 +39,29 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, word)
 
+	if word == nil {
+		return
+	}
+
 	// Verify the word data
 	assert.Equal(t, "test", word.Text)
 	assert.Equal(t, "fr", word.Language)
-	
+
 	// Check that we have definitions
 	assert.Greater(t, len(word.Definitions), 0)
-	
+
 	// Check that we have examples
 	assert.Greater(t, len(word.Examples), 0)
-	
+
 	// Check that we have synonyms
 	assert.Greater(t, len(word.Synonyms), 0)
-	
+
 	// Check that we have a pronunciation
 	assert.NotEmpty(t, word.Pronunciation)
-	
+
 	// Check that we have an etymology
 	assert.NotEmpty(t, word.Etymology)
-	
+
 	// Check that we have a plural form
 	assert.Contains(t, word.Translations, "plural")
 }
