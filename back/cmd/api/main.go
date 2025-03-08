@@ -59,7 +59,7 @@ func run() error {
 	wiktionaryAPI := dictionary.NewWiktionaryAPI(log)
 
 	// Initialize services
-	wordService := word.NewService(wordRepo, wiktionaryAPI)
+	wordService := word.NewService(wordRepo, wiktionaryAPI, log)
 
 	// Create and start server
 	srv := server.NewServer(cfg, log, wordService)

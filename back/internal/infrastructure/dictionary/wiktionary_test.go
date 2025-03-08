@@ -63,9 +63,12 @@ func TestFetchWord_Success(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
+	if result == nil {
+		return
+	}
 	assert.Equal(t, "test", result.Text)
 	assert.Equal(t, "en", result.Language)
-	
+
 	// Check if Definitions slice exists and has elements before accessing
 	assert.NotNil(t, result.Definitions)
 	if len(result.Definitions) > 0 {
@@ -73,9 +76,9 @@ func TestFetchWord_Success(t *testing.T) {
 	} else {
 		assert.Fail(t, "Expected definitions to be populated")
 	}
-	
+
 	assert.Equal(t, "tɛst", result.Pronunciation)
-	
+
 	// Check if Translations map exists before accessing
 	assert.NotNil(t, result.Translations)
 	assert.Equal(t, "test", result.Translations["fr"])
@@ -169,4 +172,3 @@ func TestFetchWord_ErrorResponse(t *testing.T) {
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "received non-200 response")
 }
-

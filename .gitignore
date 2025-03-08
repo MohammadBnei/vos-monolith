@@ -20,4 +20,3 @@ go.work
 # Docker volumes
 postgres_/
 redis_/
-.env

@@ -27,8 +27,8 @@ func TestLoadConfig(t *testing.T) {
 		if cfg.HTTPPort != "8080" {
 			t.Errorf("Expected HTTPPort to be '8080', got %s", cfg.HTTPPort)
 		}
-		if cfg.LogLevel != "debug" {
-			t.Errorf("Expected LogLevel to be 'debug', got %s", cfg.LogLevel)
+		if cfg.LogLevel != "info" {
+			t.Errorf("Expected LogLevel to be 'info', got %s", cfg.LogLevel)
 		}
 		if cfg.DatabaseURL != "postgres://user:password@localhost:5432/voconsteroid" {
 			t.Errorf("Expected DatabaseURL to be 'postgres://user:password@localhost:5432/voconsteroid', got %s", cfg.DatabaseURL)

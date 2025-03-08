@@ -1,7 +1,6 @@
 package server
 
 import (
-	"net/http"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
@@ -14,7 +13,7 @@ func (s *Server) setupSwagger() {
 	// Only enable Swagger UI in development mode
 	if s.cfg.LogLevel == "debug" || gin.Mode() == gin.DebugMode {
 		s.log.Info().Msg("Enabling Swagger UI in development mode")
-		
+
 		// Serve the Swagger UI
 		s.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
