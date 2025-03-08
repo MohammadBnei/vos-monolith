@@ -61,7 +61,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Track if we're in the French section
 	var inFrenchSection bool = false
-	var frenchSectionID string
 
 	// Parse the table of contents to get section IDs and structure
 	c.OnHTML("#mw-panel-toc-list", func(e *colly.HTMLElement) {
@@ -76,7 +75,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				if langSpan == "Français" {
 					w.logger.Debug().Str("sectionID", sectionID).Msg("Found French section in TOC")
 					inFrenchSection = true
-					frenchSectionID = strings.TrimPrefix(sectionID, "toc-")
 
 					// Now parse the subsections of the French section
 					li.ForEach("ul li", func(_ int, subLi *colly.HTMLElement) {
@@ -120,7 +118,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					if plural != "" && plural != newWord.Text {
 						w.logger.Debug().Str("plural", plural).Msg("Found plural form")
 						newWord.Translations["plural"] = plural
-							
+
 						// Add this as a word form
 						pluralAttributes := map[string]string{"number": "plural"}
 						newWord.AddWordForm(plural, pluralAttributes, false)
@@ -140,7 +138,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if strings.Contains(wordType, "masculin") || strings.Contains(wordType, "féminin") {
 			w.logger.Debug().Str("wordType", wordType).Msg("Found word type")
 			newWord.Gender = wordType
-			
+
 			// If this is a form of another word, try to extract the lemma
 			if strings.Contains(wordType, "de ") {
 				parts := strings.Split(wordType, "de ")
@@ -188,18 +186,18 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 			newWord.Etymology = etymologyText
 		}
 	})
-	
+
 	// Extract usage notes
 	c.OnHTML("#Usages, #Usage_notes", func(e *colly.HTMLElement) {
 		if !inFrenchSection {
 			return
 		}
-		
+
 		w.logger.Debug().Msg("Found usage notes section")
-		
+
 		// Look for the content after the usage notes heading
 		nextElem := e.DOM.Parent().Next()
-		
+
 		// Try different possible formats for usage notes
 		if nextElem.Is("ul") {
 			nextElem.Find("li").Each(func(_ int, li *goquery.Selection) {
@@ -303,7 +301,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						examples = append(examples, exampleText)
 					}
 				})
-				
+
 				// Add the definition using the entity method
 				newWord.AddDefinition(definitionText, "noun", examples)
 				w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
