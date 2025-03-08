@@ -35,7 +35,7 @@ func NewServer(cfg *config.Config, log zerolog.Logger) *Server {
 	}
 
 	router := gin.New()
-	
+
 	return &Server{
 		cfg:          cfg,
 		log:          log,
@@ -64,7 +64,7 @@ func (s *Server) Run() error {
 			Str("port", s.cfg.HTTPPort).
 			Str("app", s.cfg.AppName).
 			Msg("Starting server")
-		
+
 		if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			s.serverErrors <- fmt.Errorf("server error: %w", err)
 		}
@@ -95,7 +95,7 @@ func (s *Server) Shutdown() error {
 		if err := s.srv.Shutdown(ctx); err != nil {
 			return fmt.Errorf("graceful shutdown failed: %w", err)
 		}
-		
+
 		s.log.Info().Msg("Server stopped")
 		return nil
 	}
@@ -105,7 +105,7 @@ func (s *Server) Shutdown() error {
 func (s *Server) setupMiddleware() {
 	// Add recovery middleware
 	s.router.Use(gin.Recovery())
-	
+
 	// Add logger middleware
 	s.router.Use(s.loggerMiddleware())
 }
@@ -114,7 +114,7 @@ func (s *Server) setupMiddleware() {
 func (s *Server) setupRoutes() {
 	// Health check endpoint
 	s.router.GET("/health", s.healthCheck)
-	
+
 	// API routes would be registered here or in separate handler files
 }
 
@@ -144,15 +144,4 @@ func (s *Server) loggerMiddleware() gin.HandlerFunc {
 			Dur("duration", time.Since(start)).
 			Msg("Request completed")
 	}
-}
-
-// healthCheck handles health check requests.
-func (s *Server) healthCheck(c *gin.Context) {
-	log := c.MustGet("logger").(zerolog.Logger)
-	log.Debug().Msg("Health check request")
-	
-	c.JSON(http.StatusOK, gin.H{
-		"status": "ok",
-		"app":    s.cfg.AppName,
-	})
 }
