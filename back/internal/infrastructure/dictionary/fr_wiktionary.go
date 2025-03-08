@@ -272,7 +272,20 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 			// If that fails, fall back to getting all text and cleaning it later
 			if definitionText == "" {
-				definitionText = strings.TrimSpace(li.Text)
+				// Get the full text but we'll need to clean it
+				fullText := strings.TrimSpace(li.Text)
+				
+				// Remove examples from the definition text
+				// Examples are typically in quotes or after a colon
+				if idx := strings.Index(fullText, " : "); idx > 0 {
+					definitionText = strings.TrimSpace(fullText[:idx])
+				} else if idx := strings.Index(fullText, " — "); idx > 0 {
+					definitionText = strings.TrimSpace(fullText[:idx])
+				} else if idx := strings.Index(fullText, "« "); idx > 0 {
+					definitionText = strings.TrimSpace(fullText[:idx])
+				} else {
+					definitionText = fullText
+				}
 			}
 
 			// Skip empty definitions
@@ -280,9 +293,32 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				return
 			}
 
+			// Store the word type (noun, adjective, etc.) in the definition
+			var wordType string
+			if currentSection == "definitions" {
+				// Check for headings like "Nom commun", "Adjectif", etc.
+				for _, h := range []string{"Nom commun", "Adjectif", "Verbe", "Adverbe"} {
+					if strings.Contains(e.DOM.Parent().Find("h3").Text(), h) {
+						wordType = h
+						break
+					}
+				}
+			}
+
 			// Add definition type prefix if available
 			if currentDefinitionType != "" {
 				definitionText = "(" + currentDefinitionType + ") " + definitionText
+			}
+
+			// Add word type if available
+			if wordType != "" && !strings.HasPrefix(definitionText, "("+wordType+")") {
+				if strings.HasPrefix(definitionText, "(") {
+					// Already has a type, append the word type
+					definitionText = "(" + wordType + ", " + definitionText[1:]
+				} else {
+					// No type yet, add the word type
+					definitionText = "(" + wordType + ") " + definitionText
+				}
 			}
 
 			// Add the definition
@@ -301,6 +337,28 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					newWord.Examples = append(newWord.Examples, exampleText)
 				}
 			})
+			
+			// Look for examples in the text that might not be in span.example
+			fullText := strings.TrimSpace(li.Text)
+			if definitionText != fullText {
+				// Check for examples after a colon or em dash
+				var exampleText string
+				if idx := strings.Index(fullText, " : "); idx > 0 {
+					exampleText = strings.TrimSpace(fullText[idx+3:])
+				} else if idx := strings.Index(fullText, " — "); idx > 0 {
+					exampleText = strings.TrimSpace(fullText[idx+3:])
+				} else if idx := strings.Index(fullText, "« "); idx > 0 {
+					exampleText = strings.TrimSpace(fullText[idx:])
+					// Clean up quotes
+					exampleText = strings.ReplaceAll(exampleText, "« ", "")
+					exampleText = strings.ReplaceAll(exampleText, " »", "")
+				}
+				
+				if exampleText != "" && !containsString(newWord.Examples, exampleText) {
+					w.logger.Debug().Str("example", exampleText).Msg("Found example in text")
+					newWord.Examples = append(newWord.Examples, exampleText)
+				}
+			}
 
 			foundDefinitions = true
 		})
@@ -374,7 +432,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	})
 
 	// Additional backup method to find definitions in paragraphs
-	c.OnHTML("div.mw-heading-3:has(span.titredef) ~ p, h3:has(span.titredef) ~ p, div.mw-heading.mw-heading3#Noun ~ p, div.mw-heading.mw-heading3#Noun + p", func(e *colly.HTMLElement) {
+	c.OnHTML("div.mw-heading-3:has(span.titredef) ~ p, h3:has(span.titredef) ~ p, div.mw-heading.mw-heading3#Noun ~ p, div.mw-heading.mw-heading3#Noun + p, h3#Nom_commun + p", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
@@ -382,23 +440,71 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 		// Only process if we haven't found definitions yet
 		if !foundDefinitions {
-			definitionText := strings.TrimSpace(e.Text)
+			fullText := strings.TrimSpace(e.Text)
 
 			// Skip empty definitions or paragraphs that are likely not definitions
-			if definitionText == "" || len(definitionText) < 5 {
+			if fullText == "" || len(fullText) < 5 {
 				return
 			}
 
 			w.logger.Debug().Msg("Found definition in paragraph")
+
+			// Try to separate definition from examples
+			var definitionText string
+			var exampleText string
+			
+			// Check for examples after a colon or em dash
+			if idx := strings.Index(fullText, " : "); idx > 0 {
+				definitionText = strings.TrimSpace(fullText[:idx])
+				exampleText = strings.TrimSpace(fullText[idx+3:])
+			} else if idx := strings.Index(fullText, " — "); idx > 0 {
+				definitionText = strings.TrimSpace(fullText[:idx])
+				exampleText = strings.TrimSpace(fullText[idx+3:])
+			} else if idx := strings.Index(fullText, "« "); idx > 0 {
+				definitionText = strings.TrimSpace(fullText[:idx])
+				exampleText = strings.TrimSpace(fullText[idx:])
+				// Clean up quotes
+				exampleText = strings.ReplaceAll(exampleText, "« ", "")
+				exampleText = strings.ReplaceAll(exampleText, " »", "")
+			} else {
+				definitionText = fullText
+			}
+
+			// Get the word type from the heading
+			var wordType string
+			headingText := e.DOM.Parent().Find("h3").Text()
+			for _, h := range []string{"Nom commun", "Adjectif", "Verbe", "Adverbe"} {
+				if strings.Contains(headingText, h) {
+					wordType = h
+					break
+				}
+			}
 
 			// Add definition type prefix if available
 			if currentDefinitionType != "" {
 				definitionText = "(" + currentDefinitionType + ") " + definitionText
 			}
 
+			// Add word type if available
+			if wordType != "" && !strings.HasPrefix(definitionText, "("+wordType+")") {
+				if strings.HasPrefix(definitionText, "(") {
+					// Already has a type, append the word type
+					definitionText = "(" + wordType + ", " + definitionText[1:]
+				} else {
+					// No type yet, add the word type
+					definitionText = "(" + wordType + ") " + definitionText
+				}
+			}
+
 			// Add the definition
 			newWord.Definitions = append(newWord.Definitions, definitionText)
 			w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition in paragraph")
+
+			// Add example if found
+			if exampleText != "" && !containsString(newWord.Examples, exampleText) {
+				newWord.Examples = append(newWord.Examples, exampleText)
+				w.logger.Debug().Str("example", exampleText).Msg("Found example in paragraph")
+			}
 
 			foundDefinitions = true
 		}
@@ -514,10 +620,38 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 			// Try to extract from any paragraph that might contain a definition
 			c.OnHTML("p", func(e *colly.HTMLElement) {
 				if !foundDefinitions {
-					definitionText := strings.TrimSpace(e.Text)
-					if definitionText != "" && len(definitionText) > 10 && !strings.HasPrefix(definitionText, "From") {
+					fullText := strings.TrimSpace(e.Text)
+					if fullText != "" && len(fullText) > 10 && !strings.HasPrefix(fullText, "From") {
+						// Try to separate definition from examples
+						var definitionText string
+						var exampleText string
+						
+						// Check for examples after a colon or em dash
+						if idx := strings.Index(fullText, " : "); idx > 0 {
+							definitionText = strings.TrimSpace(fullText[:idx])
+							exampleText = strings.TrimSpace(fullText[idx+3:])
+						} else if idx := strings.Index(fullText, " — "); idx > 0 {
+							definitionText = strings.TrimSpace(fullText[:idx])
+							exampleText = strings.TrimSpace(fullText[idx+3:])
+						} else if idx := strings.Index(fullText, "« "); idx > 0 {
+							definitionText = strings.TrimSpace(fullText[:idx])
+							exampleText = strings.TrimSpace(fullText[idx:])
+							// Clean up quotes
+							exampleText = strings.ReplaceAll(exampleText, "« ", "")
+							exampleText = strings.ReplaceAll(exampleText, " »", "")
+						} else {
+							definitionText = fullText
+						}
+						
 						w.logger.Debug().Str("definition", definitionText).Msg("Found definition in paragraph with fallback method")
 						newWord.Definitions = append(newWord.Definitions, definitionText)
+						
+						// Add example if found
+						if exampleText != "" && !containsString(newWord.Examples, exampleText) {
+							newWord.Examples = append(newWord.Examples, exampleText)
+							w.logger.Debug().Str("example", exampleText).Msg("Found example in paragraph with fallback method")
+						}
+						
 						foundDefinitions = true
 					}
 				}
@@ -568,4 +702,14 @@ func removeDuplicates(strSlice []string) []string {
 		}
 	}
 	return list
+}
+
+// Helper function to check if a string is in a slice
+func containsString(slice []string, str string) bool {
+	for _, item := range slice {
+		if item == str {
+			return true
+		}
+	}
+	return false
 }
