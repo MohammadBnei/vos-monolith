@@ -2,7 +2,6 @@ package repository_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -11,10 +10,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"voconsteroid/internal/domain/word"
 	"voconsteroid/internal/infrastructure/repository"
+)
+
+import (
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 // setupTestDatabase creates a PostgreSQL container and returns a connection pool
@@ -23,34 +28,29 @@ func setupTestDatabase(t *testing.T) (*pgxpool.Pool, func()) {
 
 	ctx := context.Background()
 
-	// Define PostgreSQL container
-	req := testcontainers.ContainerRequest{
-		Image:        "postgres:16-alpine",
-		ExposedPorts: []string{"5432/tcp"},
-		Env: map[string]string{
-			"POSTGRES_USER":     "testuser",
-			"POSTGRES_PASSWORD": "testpass",
-			"POSTGRES_DB":       "testdb",
-		},
-		WaitingFor: wait.ForHealthCheck(),
-	}
+	// Define PostgreSQL container using the postgres module
+	dbName := "testdb"
+	dbUser := "testuser"
+	dbPassword := "testpass"
 
-	// Start container
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
+	postgresContainer, err := postgres.Run(ctx,
+		"postgres:16-alpine",
+		postgres.WithDatabase(dbName),
+		postgres.WithUsername(dbUser),
+		postgres.WithPassword(dbPassword),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(5*time.Second),
+		),
+	)
 	require.NoError(t, err)
 
-	// Get host and port
-	host, err := container.Host(ctx)
-	require.NoError(t, err)
-
-	port, err := container.MappedPort(ctx, "5432")
+	// Get connection string
+	connString, err := postgresContainer.ConnectionString(ctx, "sslmode=disable")
 	require.NoError(t, err)
 
 	// Connect to database
-	connString := fmt.Sprintf("postgres://testuser:testpass@%s:%s/testdb", host, port.Port())
 	dbpool, err := pgxpool.New(ctx, connString)
 	require.NoError(t, err)
 
@@ -79,7 +79,9 @@ func setupTestDatabase(t *testing.T) (*pgxpool.Pool, func()) {
 	// Return cleanup function
 	cleanup := func() {
 		dbpool.Close()
-		container.Terminate(ctx)
+		if err := testcontainers.TerminateContainer(postgresContainer); err != nil {
+			t.Logf("failed to terminate container: %s", err)
+		}
 	}
 
 	return dbpool, cleanup
