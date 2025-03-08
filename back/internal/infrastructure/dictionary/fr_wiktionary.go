@@ -50,6 +50,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// Track the current section
 	var currentSection string
 	var inDefinitionList bool
+	var currentDefinitionIndex int
 
 	// Extract etymology
 	c.OnHTML("div.mw-heading-3:has(span.titreetym) + dl", func(e *colly.HTMLElement) {
@@ -92,6 +93,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if e.ChildText("span.titredef") != "" {
 			currentSection = "definitions"
 			inDefinitionList = false
+			currentDefinitionIndex = 0
 		} else if e.ChildText("span.titresyno") != "" {
 			currentSection = "synonyms"
 			inDefinitionList = false
