@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -22,8 +23,18 @@ func setupMockDB(t *testing.T) (pgxmock.PgxPoolIface, *WordRepository) {
 	require.NoError(t, err)
 
 	logger := zerolog.New(zerolog.NewTestWriter(t))
+	
+	// Create a type that satisfies both pgxpool.Pool and pgxmock.PgxPoolIface
+	// This is a workaround for the type mismatch
+	mockPool := &struct {
+		pgxmock.PgxPoolIface
+		*pgxpool.Pool
+	}{
+		PgxPoolIface: mock,
+	}
+	
 	repo := &WordRepository{
-		db:     mock,
+		db:     mockPool,
 		logger: logger.With().Str("component", "word_repository_test").Logger(),
 	}
 
