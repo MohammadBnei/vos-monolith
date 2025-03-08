@@ -1,35 +1,36 @@
 BIN_DIR = bin
 APP_NAME = voconsteroid
 BINARY = $(BIN_DIR)/$(APP_NAME)
+DATABASE_URL ?= postgres://user:password@localhost:5432/voconsteroid?sslmode=disable
 
 .PHONY: run
 run: ## Run the application with air for live reload
-	cd back && air
+	air
 
 .PHONY: build
 build: ## Build the application
 	@mkdir -p $(BIN_DIR)
-	cd back && go build -o ../$(BINARY) ./api/main.go
+	go build -o ../$(BINARY) ./api/main.go
 
 .PHONY: lint
 lint: ## Run golangci-lint
-	cd back && golangci-lint run ./...
+	golangci-lint run ./...
 
 .PHONY: tidy
 tidy: ## Run go mod tidy
-	cd back && go mod tidy
+	go mod tidy
 
 .PHONY: test
 test: ## Run tests
-	cd back && go test -v ./...
+	go test -v ./...
 
 .PHONY: migrate
 migrate: ## Run database migrations
-	cd back && migrate -path internal/infrastructure/migrations -database "$${DATABASE_URL}" up
+	migrate -path internal/infrastructure/migrations -database "$(DATABASE_URL)" up
 
 .PHONY: migrate-down
 migrate-down: ## Rollback database migrations
-	cd back && migrate -path internal/infrastructure/migrations -database "$${DATABASE_URL}" down
+	migrate -path internal/infrastructure/migrations -database "$(DATABASE_URL)" down
 
 .PHONY: clean
 clean: ## Clean build artifacts
