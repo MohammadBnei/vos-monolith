@@ -2,14 +2,20 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/joho/godotenv"
+	
 	"voconsteroid/internal/config"
+	"voconsteroid/internal/domain/word"
+	"voconsteroid/internal/infrastructure/dictionary"
+	"voconsteroid/internal/infrastructure/repository"
 	"voconsteroid/internal/server"
 	"voconsteroid/pkg/logger"
 )
@@ -41,8 +47,24 @@ func run() error {
 	log := logger.NewWithConfig(logConfig)
 	log.Info().Str("app", cfg.AppName).Msg("Starting application")
 
+	// Initialize database connection
+	dbpool, err := pgxpool.Connect(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer dbpool.Close()
+	
+	// Initialize repositories
+	wordRepo := repository.NewWordRepository(dbpool, log)
+	
+	// Initialize external APIs
+	wiktionaryAPI := dictionary.NewWiktionaryAPI(log)
+	
+	// Initialize services
+	wordService := word.NewService(wordRepo, wiktionaryAPI)
+	
 	// Create and start server
-	srv := server.NewServer(cfg, log)
+	srv := server.NewServer(cfg, log, wordService)
 	if err := srv.Run(); err != nil {
 		return fmt.Errorf("failed to start server: %w", err)
 	}

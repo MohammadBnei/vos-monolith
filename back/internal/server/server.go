@@ -20,13 +20,16 @@ type Server struct {
 	router *gin.Engine
 	srv    *http.Server
 
+	// Services
+	wordService word.Service
+
 	// Channels for managing server lifecycle
 	serverErrors chan error
 	shutdown     chan struct{}
 }
 
 // NewServer creates a new server instance with the provided configuration and logger.
-func NewServer(cfg *config.Config, log zerolog.Logger) *Server {
+func NewServer(cfg *config.Config, log zerolog.Logger, wordService word.Service) *Server {
 	// Set gin mode based on log level
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -40,6 +43,7 @@ func NewServer(cfg *config.Config, log zerolog.Logger) *Server {
 		cfg:          cfg,
 		log:          log,
 		router:       router,
+		wordService:  wordService,
 		serverErrors: make(chan error, 1),
 		shutdown:     make(chan struct{}, 1),
 	}
@@ -121,7 +125,15 @@ func (s *Server) setupRoutes() {
 	// Demo error endpoint
 	s.router.GET("/error", s.demoError)
 	
-	// API routes would be registered here or in separate handler files
+	// Word API routes
+	api := s.router.Group("/api/v1")
+	{
+		words := api.Group("/words")
+		{
+			words.POST("/search", s.searchWord)
+			words.GET("/recent", s.getRecentWords)
+		}
+	}
 }
 
 // loggerMiddleware creates a middleware that logs HTTP requests.

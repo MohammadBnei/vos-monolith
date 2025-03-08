@@ -6,6 +6,7 @@ The Vocabulary Learning App is designed to help users expand their vocabulary, u
 
 ## Key Features
 
+- **Word Search**: Look up words in multiple languages with definitions, examples, and etymology
 - **Word Discovery**: Daily curated word suggestions with definitions, examples, and etymology
 - **Contextual Learning**: Real-world examples from literature, news, and media
 - **Spaced Repetition**: Intelligent scheduling for optimal retention
@@ -14,6 +15,7 @@ The Vocabulary Learning App is designed to help users expand their vocabulary, u
 - **Gamification**: Earn points, badges, and streaks for consistent learning
 - **Pronunciation Guide**: Audio examples for proper pronunciation
 - **Word Challenges**: Interactive quizzes and games to reinforce learning
+- **Multi-language Support**: Search for words in different languages
 
 ## Technology Stack
 
@@ -37,7 +39,7 @@ The Vocabulary Learning App is designed to help users expand their vocabulary, u
 
 ### Phase 1: Core Features
 
-- [ ] Basic word lookup functionality
+- [x] Basic word lookup functionality
 - [ ] User authentication system
 - [ ] Simple quiz system
 - [ ] Basic progress tracking
