@@ -24,7 +24,7 @@ func setupMockDB(t *testing.T) (pgxmock.PgxPoolIface, *WordRepository) {
 
 	logger := zerolog.New(zerolog.NewTestWriter(t))
 	repo := &WordRepository{
-		db:     mock.(*pgxpool.Pool),
+		db:     mock,
 		logger: logger.With().Str("component", "word_repository_test").Logger(),
 	}
 
