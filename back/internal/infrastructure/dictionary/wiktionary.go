@@ -60,6 +60,7 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 
 	// For French language, use the specialized French Wiktionary scraper
 	if language == "fr" {
+		w.logger.Debug().Msg("Using specialized French Wiktionary scraper")
 		frenchAPI := NewFrenchWiktionaryAPI(w.logger)
 		return frenchAPI.FetchWord(ctx, text, language)
 	}

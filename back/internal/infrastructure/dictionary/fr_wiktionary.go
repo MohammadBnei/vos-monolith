@@ -55,6 +55,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	c.OnHTML("div.mw-heading-3:has(span.titreetym) + dl", func(e *colly.HTMLElement) {
 		etymology := strings.TrimSpace(e.Text)
 		if etymology != "" {
+			w.logger.Debug().Str("etymology", etymology).Msg("Found etymology")
 			newWord.Etymology = etymology
 		}
 	})
@@ -67,6 +68,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					plural := strings.TrimSpace(td.Text)
 					if plural != "" && plural != newWord.Text {
 						// Store plural in translations as a special case
+						w.logger.Debug().Str("plural", plural).Msg("Found plural form")
 						newWord.Translations["plural"] = plural
 					}
 				})
@@ -79,6 +81,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if newWord.Pronunciation == "" {
 			pronunciation := strings.TrimSpace(e.Text)
 			if strings.HasPrefix(pronunciation, "\\") && strings.HasSuffix(pronunciation, "\\") {
+				w.logger.Debug().Str("pronunciation", pronunciation).Msg("Found pronunciation")
 				newWord.Pronunciation = pronunciation
 			}
 		}
@@ -135,6 +138,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		e.ForEach("li", func(_ int, li *colly.HTMLElement) {
 			synonym := strings.TrimSpace(li.Text)
 			if synonym != "" {
+				w.logger.Debug().Str("synonym", synonym).Msg("Found synonym")
 				newWord.Synonyms = append(newWord.Synonyms, synonym)
 			}
 		})
