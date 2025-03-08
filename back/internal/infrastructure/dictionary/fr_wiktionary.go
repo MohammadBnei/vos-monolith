@@ -73,7 +73,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	})
 
 	// Extract etymology
-	c.OnHTML("div.mw-heading-3:has(span.titreetym) + dl, div.mw-heading.mw-heading3#Etymology + p", func(e *colly.HTMLElement) {
+	c.OnHTML("div.mw-heading-3:has(span.titreetym) + dl, div.mw-heading.mw-heading3#Etymology + p, h3#Étymologie + p, div.mw-heading-3 + p", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
@@ -208,7 +208,8 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		} else if e.ChildText("span.titresyno") != "" {
 			currentSection = "synonyms"
 			inDefinitionList = false
-		} else if headingText == "Noun" || headingID == "Noun" {
+		} else if headingText == "Noun" || headingID == "Noun" || 
+			headingID == "Nom_commun" || strings.Contains(headingText, "Nom commun") {
 			w.logger.Debug().Str("section", "Noun").Msg("Found noun section")
 			currentSection = "definitions"
 			inDefinitionList = false
@@ -241,7 +242,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Extract definitions from any ordered list following a definition heading
 	// This handles various HTML structures that might contain definitions
-	c.OnHTML("div.mw-heading-3:has(span.titredef) + p + ol, div.mw-heading-3:has(span.titredef) + ol, h3:has(span.titredef) + ol, h3:has(span.titredef) + p + ol, ol, div.mw-heading.mw-heading3#Noun + ol, div.mw-heading.mw-heading3#Noun + p + ol", func(e *colly.HTMLElement) {
+	c.OnHTML("div.mw-heading-3:has(span.titredef) + p + ol, div.mw-heading-3:has(span.titredef) + ol, h3:has(span.titredef) + ol, h3:has(span.titredef) + p + ol, ol, div.mw-heading.mw-heading3#Noun + ol, div.mw-heading.mw-heading3#Noun + p + ol, h3#Nom_commun + ol, div.mw-heading-3 + ol", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
@@ -440,7 +441,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	c.Wait()
 
 	// Extract definitions from headword line
-	c.OnHTML("p span.headword-line", func(e *colly.HTMLElement) {
+	c.OnHTML("p span.headword-line, p.ligne-de-forme", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
@@ -474,6 +475,21 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					foundDefinitions = true
 				}
 			}
+		}
+	})
+
+	// Extract definitions from French Wiktionary specific format
+	c.OnHTML("div.mw-heading-3:has(span.titredef) + p, h3:has(span.titredef) + p, div.mw-heading-3 + p, h3#Nom_commun + p", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+
+		definitionText := strings.TrimSpace(e.Text)
+		if definitionText != "" && !strings.HasPrefix(definitionText, "(") {
+			w.logger.Debug().Str("definition", definitionText).Msg("Found definition in paragraph after heading")
+			newWord.Definitions = append(newWord.Definitions, definitionText)
+			foundDefinitions = true
 		}
 	})
 
