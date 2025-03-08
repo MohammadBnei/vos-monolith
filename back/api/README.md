@@ -11,11 +11,13 @@ The API provides endpoints for:
 
 ## Swagger UI
 
-When the application is running, you can access the Swagger UI at:
+When the application is running in development mode (LogLevel=debug), you can access the Swagger UI at:
 
 ```
 http://localhost:8080/swagger/index.html
 ```
+
+Note: Swagger UI is only available in development mode for security reasons.
 
 ## Swagger YAML
 
