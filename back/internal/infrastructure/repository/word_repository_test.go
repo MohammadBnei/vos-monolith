@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pashagolub/pgxmock/v4"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,7 @@ func setupMockDB(t *testing.T) (pgxmock.PgxPoolIface, *WordRepository) {
 	require.NoError(t, err)
 
 	logger := zerolog.New(zerolog.NewTestWriter(t))
-	
+
 	repo := &WordRepository{
 		db:     mock,
 		logger: logger.With().Str("component", "word_repository_test").Logger(),
