@@ -105,16 +105,22 @@ func (s *Server) Shutdown() error {
 func (s *Server) setupMiddleware() {
 	// Add recovery middleware
 	s.router.Use(gin.Recovery())
-
+	
 	// Add logger middleware
 	s.router.Use(s.loggerMiddleware())
+	
+	// Add error handler middleware
+	s.router.Use(s.errorHandler())
 }
 
 // setupRoutes configures all routes for the server.
 func (s *Server) setupRoutes() {
 	// Health check endpoint
 	s.router.GET("/health", s.healthCheck)
-
+	
+	// Demo error endpoint
+	s.router.GET("/error", s.demoError)
+	
 	// API routes would be registered here or in separate handler files
 }
 

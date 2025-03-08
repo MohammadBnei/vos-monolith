@@ -3,11 +3,19 @@ package logger
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/pkgerrors"
+)
+
+// Environment types
+const (
+	EnvDevelopment = "development"
+	EnvProduction  = "production"
+	EnvTest        = "test"
 )
 
 // Valid log levels
@@ -24,28 +32,65 @@ const (
 func init() {
 	// Set default time format to ISO8601
 	zerolog.TimeFieldFormat = time.RFC3339
+	
+	// Always enable stack traces for errors
+	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+}
+
+// Config holds logger configuration options
+type Config struct {
+	// Environment determines the output format (development/production)
+	Environment string
+	// Level sets the minimum log level
+	Level string
+	// Output is where the logs will be written
+	Output io.Writer
+}
+
+// DefaultConfig returns a default configuration
+func DefaultConfig() Config {
+	return Config{
+		Environment: EnvDevelopment,
+		Level:       LevelInfo,
+		Output:      os.Stdout,
+	}
 }
 
 // New returns a new zerolog.Logger instance with the given log level.
 // The log level should be one of the following: trace, debug, info, warn, error, fatal, panic.
 // If an invalid log level is provided, the logger defaults to info.
 func New(level string) zerolog.Logger {
-	logLevel, err := zerolog.ParseLevel(level)
+	return NewWithConfig(Config{
+		Environment: EnvDevelopment,
+		Level:       level,
+		Output:      os.Stdout,
+	})
+}
+
+// NewWithConfig creates a logger with the specified configuration
+func NewWithConfig(config Config) zerolog.Logger {
+	logLevel, err := zerolog.ParseLevel(config.Level)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid log level '%s', defaulting to 'info'\n", level)
+		fmt.Fprintf(os.Stderr, "Invalid log level '%s', defaulting to 'info'\n", config.Level)
 		logLevel = zerolog.InfoLevel
 	}
 
-	// Enable stack traces for errors in debug and error levels
-	if logLevel == zerolog.ErrorLevel || logLevel == zerolog.DebugLevel {
-		zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
+	var output io.Writer
+	if config.Output == nil {
+		config.Output = os.Stdout
 	}
 
-	// Configure console output with colors and readable format
-	output := zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: time.RFC3339,
-		NoColor:    os.Getenv("NO_COLOR") != "",
+	// Configure output format based on environment
+	if config.Environment == EnvProduction {
+		// In production, use JSON format
+		output = config.Output
+	} else {
+		// In development/test, use pretty console output
+		output = zerolog.ConsoleWriter{
+			Out:        config.Output,
+			TimeFormat: time.RFC3339,
+			NoColor:    os.Getenv("NO_COLOR") != "",
+		}
 	}
 
 	// Create and configure the logger
