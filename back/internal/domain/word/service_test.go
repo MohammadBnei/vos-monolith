@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -53,19 +54,29 @@ func TestNewService(t *testing.T) {
 	// Setup
 	repo := new(MockRepository)
 	dictAPI := new(MockDictionaryAPI)
+	logger := zerolog.New(zerolog.NewTestWriter(t))
 
 	// Execute
-	svc := NewService(repo, dictAPI)
+	svc := NewService(repo, dictAPI, logger)
 
 	// Assert
 	assert.NotNil(t, svc)
 }
 
-func TestSearch_ExistingWord(t *testing.T) {
-	// Setup
+// setupTestService creates a service with mocks for testing
+func setupTestService(t *testing.T) (*MockRepository, *MockDictionaryAPI, Service) {
 	repo := new(MockRepository)
 	dictAPI := new(MockDictionaryAPI)
-	svc := NewService(repo, dictAPI)
+	logger := zerolog.New(zerolog.NewTestWriter(t))
+	
+	svc := NewService(repo, dictAPI, logger)
+	
+	return repo, dictAPI, svc
+}
+
+func TestSearch_ExistingWord(t *testing.T) {
+	// Setup
+	repo, dictAPI, svc := setupTestService(t)
 
 	ctx := context.Background()
 	expectedWord := &Word{
@@ -89,9 +100,7 @@ func TestSearch_ExistingWord(t *testing.T) {
 
 func TestSearch_NewWord(t *testing.T) {
 	// Setup
-	repo := new(MockRepository)
-	dictAPI := new(MockDictionaryAPI)
-	svc := NewService(repo, dictAPI)
+	repo, dictAPI, svc := setupTestService(t)
 
 	ctx := context.Background()
 	expectedWord := &Word{
@@ -121,9 +130,7 @@ func TestSearch_NewWord(t *testing.T) {
 
 func TestSearch_EmptyText(t *testing.T) {
 	// Setup
-	repo := new(MockRepository)
-	dictAPI := new(MockDictionaryAPI)
-	svc := NewService(repo, dictAPI)
+	repo, dictAPI, svc := setupTestService(t)
 
 	ctx := context.Background()
 
@@ -140,9 +147,7 @@ func TestSearch_EmptyText(t *testing.T) {
 
 func TestSearch_APIError(t *testing.T) {
 	// Setup
-	repo := new(MockRepository)
-	dictAPI := new(MockDictionaryAPI)
-	svc := NewService(repo, dictAPI)
+	repo, dictAPI, svc := setupTestService(t)
 
 	ctx := context.Background()
 	apiErr := errors.New("API error")
@@ -166,9 +171,7 @@ func TestSearch_APIError(t *testing.T) {
 
 func TestGetRecentWords(t *testing.T) {
 	// Setup
-	repo := new(MockRepository)
-	dictAPI := new(MockDictionaryAPI)
-	svc := NewService(repo, dictAPI)
+	repo, _, svc := setupTestService(t)
 
 	ctx := context.Background()
 	expectedWords := []*Word{
@@ -191,9 +194,7 @@ func TestGetRecentWords(t *testing.T) {
 
 func TestGetRecentWords_DefaultLimit(t *testing.T) {
 	// Setup
-	repo := new(MockRepository)
-	dictAPI := new(MockDictionaryAPI)
-	svc := NewService(repo, dictAPI)
+	repo, _, svc := setupTestService(t)
 
 	ctx := context.Background()
 	expectedWords := []*Word{
@@ -216,9 +217,7 @@ func TestGetRecentWords_DefaultLimit(t *testing.T) {
 
 func TestGetRecentWords_RepositoryError(t *testing.T) {
 	// Setup
-	repo := new(MockRepository)
-	dictAPI := new(MockDictionaryAPI)
-	svc := NewService(repo, dictAPI)
+	repo, _, svc := setupTestService(t)
 
 	ctx := context.Background()
 	repoErr := errors.New("repository error")
