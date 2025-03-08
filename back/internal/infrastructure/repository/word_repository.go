@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 
 	"voconsteroid/internal/domain/word"
@@ -109,41 +109,41 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 		FROM words
 		WHERE 1=1
 	`
-	
+
 	args := []interface{}{}
 	argIndex := 1
-	
+
 	// Add filters
 	for key, value := range filter {
 		query += fmt.Sprintf(" AND %s = $%d", key, argIndex)
 		args = append(args, value)
 		argIndex++
 	}
-	
+
 	// Add ordering and pagination
 	query += " ORDER BY updated_at DESC LIMIT $" + fmt.Sprintf("%d", argIndex)
 	args = append(args, limit)
 	argIndex++
-	
+
 	if offset > 0 {
 		query += " OFFSET $" + fmt.Sprintf("%d", argIndex)
 		args = append(args, offset)
 	}
-	
+
 	// Execute query
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query words: %w", err)
 	}
 	defer rows.Close()
-	
+
 	// Process results
 	var words []*word.Word
 	for rows.Next() {
 		var w word.Word
 		var definitions, examples []string
 		var translations map[string]string
-		
+
 		err := rows.Scan(
 			&w.ID,
 			&w.Text,
@@ -156,21 +156,21 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 			&w.CreatedAt,
 			&w.UpdatedAt,
 		)
-		
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan word row: %w", err)
 		}
-		
+
 		w.Definitions = definitions
 		w.Examples = examples
 		w.Translations = translations
-		
+
 		words = append(words, &w)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating word rows: %w", err)
 	}
-	
+
 	return words, nil
 }

@@ -33,14 +33,8 @@ func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
 
 // FetchWord retrieves word information from Wiktionary
 func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*word.Word, error) {
-	// Map language code to Wiktionary language edition
-	langPrefix := "en"
-	if language != "en" {
-		langPrefix = language
-	}
-
 	// Build URL for the API request
-	url := fmt.Sprintf("%s?action=query&format=json&prop=extracts|translations|pronunciation&titles=%s", 
+	url := fmt.Sprintf("%s?action=query&format=json&prop=extracts|translations|pronunciation&titles=%s",
 		w.baseURL, text)
 
 	// Create request with context
@@ -69,7 +63,7 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 
 	// Process response
 	newWord := word.NewWord(text, language)
-	
+
 	// Extract data from response
 	for _, page := range response.Query.Pages {
 		if page.Extract != "" {
@@ -83,12 +77,12 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 				}
 			}
 		}
-		
+
 		// Add pronunciation if available
 		if page.Pronunciation != "" {
 			newWord.Pronunciation = page.Pronunciation
 		}
-		
+
 		// Add translations if available
 		if page.Translations != nil {
 			for lang, translation := range page.Translations {

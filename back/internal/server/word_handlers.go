@@ -25,10 +25,10 @@ type RecentWordsResponse struct {
 	Words []*word.Word `json:"words"`
 }
 
-// searchWord handles requests to search for a word
-func (s *Server) searchWord(c *gin.Context) {
+// SearchWord handles requests to search for a word
+func (s *Server) SearchWord(c *gin.Context) {
 	log := c.MustGet("logger").(zerolog.Logger)
-	
+
 	var req WordSearchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.Debug().Err(err).Msg("Invalid search word request")
@@ -39,18 +39,18 @@ func (s *Server) searchWord(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Validate language
 	if req.Language == "" {
 		req.Language = "en" // Default to English
 	}
-	
+
 	// Search for the word
 	foundWord, err := s.wordService.Search(c.Request.Context(), req.Text, req.Language)
 	if err != nil {
 		status := http.StatusInternalServerError
 		message := "Failed to search for word"
-		
+
 		if err == word.ErrWordNotFound {
 			status = http.StatusNotFound
 			message = "Word not found"
@@ -58,7 +58,7 @@ func (s *Server) searchWord(c *gin.Context) {
 			status = http.StatusBadRequest
 			message = "Invalid word"
 		}
-		
+
 		log.Debug().Err(err).Str("word", req.Text).Str("language", req.Language).Msg(message)
 		c.JSON(status, ErrorResponse{
 			Status:  status,
@@ -67,22 +67,22 @@ func (s *Server) searchWord(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Return the word
 	c.JSON(http.StatusOK, WordSearchResponse{
 		Word: foundWord,
 	})
 }
 
-// getRecentWords handles requests to get recently searched words
-func (s *Server) getRecentWords(c *gin.Context) {
+// GetRecentWords handles requests to get recently searched words
+func (s *Server) GetRecentWords(c *gin.Context) {
 	log := c.MustGet("logger").(zerolog.Logger)
-	
+
 	language := c.Query("language")
 	if language == "" {
 		language = "en" // Default to English
 	}
-	
+
 	// Get recent words
 	recentWords, err := s.wordService.GetRecentWords(c.Request.Context(), language, 10)
 	if err != nil {
@@ -94,7 +94,7 @@ func (s *Server) getRecentWords(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Return the words
 	c.JSON(http.StatusOK, RecentWordsResponse{
 		Words: recentWords,

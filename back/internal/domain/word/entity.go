@@ -6,16 +6,16 @@ import (
 
 // Word represents a vocabulary word with its definitions and metadata
 type Word struct {
-	ID           string    `json:"id"`
-	Text         string    `json:"text"`
-	Language     string    `json:"language"`
-	Definitions  []string  `json:"definitions,omitempty"`
-	Examples     []string  `json:"examples,omitempty"`
-	Pronunciation string   `json:"pronunciation,omitempty"`
-	Etymology    string    `json:"etymology,omitempty"`
-	Translations map[string]string `json:"translations,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID            string            `json:"id"`
+	Text          string            `json:"text"`
+	Language      string            `json:"language"`
+	Definitions   []string          `json:"definitions,omitempty"`
+	Examples      []string          `json:"examples,omitempty"`
+	Pronunciation string            `json:"pronunciation,omitempty"`
+	Etymology     string            `json:"etymology,omitempty"`
+	Translations  map[string]string `json:"translations,omitempty"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
 }
 
 // NewWord creates a new Word entity

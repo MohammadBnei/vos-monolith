@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"voconsteroid/internal/config"
+	"voconsteroid/internal/domain/word"
 )
 
 // Server represents the HTTP server with all its dependencies.
@@ -109,10 +110,10 @@ func (s *Server) Shutdown() error {
 func (s *Server) setupMiddleware() {
 	// Add recovery middleware
 	s.router.Use(gin.Recovery())
-	
+
 	// Add logger middleware
 	s.router.Use(s.loggerMiddleware())
-	
+
 	// Add error handler middleware
 	s.router.Use(s.errorHandler())
 }
@@ -121,17 +122,17 @@ func (s *Server) setupMiddleware() {
 func (s *Server) setupRoutes() {
 	// Health check endpoint
 	s.router.GET("/health", s.healthCheck)
-	
+
 	// Demo error endpoint
 	s.router.GET("/error", s.demoError)
-	
+
 	// Word API routes
 	api := s.router.Group("/api/v1")
 	{
 		words := api.Group("/words")
 		{
-			words.POST("/search", s.searchWord)
-			words.GET("/recent", s.getRecentWords)
+			words.POST("/search", s.SearchWord)
+			words.GET("/recent", s.GetRecentWords)
 		}
 	}
 }
