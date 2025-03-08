@@ -2,6 +2,10 @@ package repository_test
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -49,26 +53,8 @@ func setupTestDatabase(t *testing.T) (*pgxpool.Pool, func()) {
 	dbpool, err := pgxpool.New(ctx, connString)
 	require.NoError(t, err)
 
-	// Create schema
-	_, err = dbpool.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS words (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			text TEXT NOT NULL,
-			language TEXT NOT NULL,
-			definitions JSONB NOT NULL DEFAULT '[]',
-			examples TEXT[] NOT NULL DEFAULT '{}',
-			pronunciation JSONB NOT NULL DEFAULT '{}',
-			etymology TEXT,
-			translations JSONB NOT NULL DEFAULT '{}',
-			word_type TEXT,
-			forms JSONB NOT NULL DEFAULT '[]',
-			search_terms TEXT[] NOT NULL DEFAULT '{}',
-			lemma TEXT,
-			created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-			updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-			UNIQUE(text, language)
-		)
-	`)
+	// Run migrations instead of creating schema manually
+	err = runMigrations(ctx, dbpool)
 	require.NoError(t, err)
 
 	// Return cleanup function
@@ -80,6 +66,43 @@ func setupTestDatabase(t *testing.T) (*pgxpool.Pool, func()) {
 	}
 
 	return dbpool, cleanup
+}
+
+// runMigrations executes all SQL migration scripts against the database
+func runMigrations(ctx context.Context, db *pgxpool.Pool) error {
+	// Path to migration files
+	migrationsPath := "../migrations"
+	
+	// Get absolute path to migrations directory
+	absPath, err := filepath.Abs(migrationsPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path to migrations: %w", err)
+	}
+	
+	// Read all SQL files from the migrations directory
+	entries, err := filepath.Glob(filepath.Join(absPath, "*.sql"))
+	if err != nil {
+		return fmt.Errorf("failed to read migration files: %w", err)
+	}
+	
+	// Sort migration files to ensure they're executed in the correct order
+	// This assumes migration files are named with a numeric prefix like "001_create_tables.sql"
+	sort.Strings(entries)
+	
+	// Execute each migration file
+	for _, entry := range entries {
+		content, err := os.ReadFile(entry)
+		if err != nil {
+			return fmt.Errorf("failed to read migration file %s: %w", entry, err)
+		}
+		
+		_, err = db.Exec(ctx, string(content))
+		if err != nil {
+			return fmt.Errorf("failed to execute migration %s: %w", entry, err)
+		}
+	}
+	
+	return nil
 }
 
 // createTestWord creates a test word for use in tests
