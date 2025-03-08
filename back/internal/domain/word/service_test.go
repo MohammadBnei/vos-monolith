@@ -24,6 +24,14 @@ func (m *MockRepository) FindByText(ctx context.Context, text, language string) 
 	return args.Get(0).(*Word), args.Error(1)
 }
 
+func (m *MockRepository) FindByAnyForm(ctx context.Context, text, language string) (*Word, error) {
+	args := m.Called(ctx, text, language)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*Word), args.Error(1)
+}
+
 func (m *MockRepository) Save(ctx context.Context, word *Word) error {
 	args := m.Called(ctx, word)
 	return args.Error(0)
