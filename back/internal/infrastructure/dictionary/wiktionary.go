@@ -12,18 +12,6 @@ import (
 	"voconsteroid/internal/domain/word"
 )
 
-// WiktionaryAPI implements the word.DictionaryAPI interface for Wiktionary
-type WiktionaryAPI struct {
-	logger zerolog.Logger
-}
-
-// NewWiktionaryAPI creates a new Wiktionary scraper
-func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
-	return &WiktionaryAPI{
-		logger: logger.With().Str("component", "wiktionary_scraper").Logger(),
-	}
-}
-
 // getBaseURL is a function variable that returns the appropriate Wiktionary URL based on the language
 // This allows for easy mocking in tests
 var (
@@ -54,14 +42,14 @@ var (
 
 // WiktionaryAPI implements the word.DictionaryAPI interface for Wiktionary
 type WiktionaryAPI struct {
-	logger    zerolog.Logger
+	logger     zerolog.Logger
 	getBaseURL func(language string) string
 }
 
 // NewWiktionaryAPI creates a new Wiktionary scraper
 func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
 	return &WiktionaryAPI{
-		logger:    logger.With().Str("component", "wiktionary_scraper").Logger(),
+		logger:     logger.With().Str("component", "wiktionary_scraper").Logger(),
 		getBaseURL: defaultGetBaseURL,
 	}
 }
@@ -69,7 +57,7 @@ func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
 // FetchWord retrieves word information from Wiktionary by scraping the web page
 func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*word.Word, error) {
 	w.logger.Debug().Str("text", text).Str("language", language).Msg("Fetching word from Wiktionary")
-	
+
 	// Create a new collector
 	c := colly.NewCollector(
 		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
@@ -81,10 +69,10 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 
 	// Create a new word
 	newWord := word.NewWord(text, language)
-	
+
 	// Track if we found any definitions
 	foundDefinitions := false
-	
+
 	// Extract definitions
 	c.OnHTML("ol li", func(e *colly.HTMLElement) {
 		definition := strings.TrimSpace(e.Text)
@@ -134,7 +122,7 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 	// Build URL for the web page
 	baseURL := w.getBaseURL(language)
 	url := fmt.Sprintf("%s/%s", baseURL, text)
-	
+
 	// Check if context is done
 	select {
 	case <-ctx.Done():
@@ -164,6 +152,6 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 		Int("examples", len(newWord.Examples)).
 		Int("translations", len(newWord.Translations)).
 		Msg("Successfully fetched word data")
-		
+
 	return newWord, nil
 }

@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
@@ -101,13 +100,13 @@ func TestFetchWord_Success(t *testing.T) {
 
 	// Check definitions
 	assert.GreaterOrEqual(t, len(result.Definitions), 1)
-	
+
 	// Check examples
 	assert.GreaterOrEqual(t, len(result.Examples), 1)
-	
+
 	// Check pronunciation
 	assert.Equal(t, "tɛst", result.Pronunciation)
-	
+
 	// Check etymology
 	assert.Contains(t, result.Etymology, "Middle English")
 }
