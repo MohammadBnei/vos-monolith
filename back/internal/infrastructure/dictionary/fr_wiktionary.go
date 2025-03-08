@@ -94,7 +94,8 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	})
 
 	// Track sections to know when we're in definitions, synonyms, etc.
-	c.OnHTML("div.mw-heading-3", func(e *colly.HTMLElement) {
+	// Handle both div.mw-heading-3 and h3 elements that might contain section headings
+	c.OnHTML("div.mw-heading-3, h3", func(e *colly.HTMLElement) {
 		titleDef := e.ChildText("span.titredef")
 		if titleDef != "" {
 			w.logger.Debug().Str("section", titleDef).Msg("Found definition section")
@@ -105,13 +106,14 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 			currentSection = "synonyms"
 			inDefinitionList = false
 		} else {
-			currentSection = ""
-			inDefinitionList = false
+			// Don't reset the section if we're not recognizing a new one
+			// This helps maintain context between different HTML elements
 		}
 	})
 
 	// Extract definitions from any ordered list following a definition heading
-	c.OnHTML("div.mw-heading-3:has(span.titredef) + p + ol, div.mw-heading-3:has(span.titredef) + ol", func(e *colly.HTMLElement) {
+	// This handles various HTML structures that might contain definitions
+	c.OnHTML("div.mw-heading-3:has(span.titredef) + p + ol, div.mw-heading-3:has(span.titredef) + ol, h3:has(span.titredef) + ol, h3:has(span.titredef) + p + ol", func(e *colly.HTMLElement) {
 		w.logger.Debug().Msg("Found definition list")
 		inDefinitionList = true
 		
@@ -180,6 +182,27 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				
 				foundDefinitions = true
 			})
+		}
+	})
+	
+	// Additional backup method to find definitions in paragraphs
+	c.OnHTML("div.mw-heading-3:has(span.titredef) ~ p, h3:has(span.titredef) ~ p", func(e *colly.HTMLElement) {
+		// Only process if we haven't found definitions yet
+		if !foundDefinitions {
+			definitionText := strings.TrimSpace(e.Text)
+			
+			// Skip empty definitions or paragraphs that are likely not definitions
+			if definitionText == "" || len(definitionText) < 5 {
+				return
+			}
+			
+			w.logger.Debug().Msg("Found definition in paragraph")
+			
+			// Add the definition
+			newWord.Definitions = append(newWord.Definitions, definitionText)
+			w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition in paragraph")
+			
+			foundDefinitions = true
 		}
 	})
 
