@@ -40,16 +40,23 @@ func (s *service) Search(ctx context.Context, text, language string) (*Word, err
 		return nil, ErrInvalidWord
 	}
 
-	// Try to find in repository first
+	// Try to find exact match first
 	word, err := s.repo.FindByText(ctx, text, language)
 	if err == nil {
-		s.logger.Debug().Str("text", text).Str("language", language).Msg("Word found in repository")
+		s.logger.Debug().Str("text", text).Str("language", language).Msg("Word found in repository by exact match")
 		return word, nil
 	}
 
-	s.logger.Debug().Str("text", text).Str("language", language).Err(err).Msg("Word not found in repository, fetching from API")
+	// If not found by exact text, try to find by any form
+	word, err = s.repo.FindByAnyForm(ctx, text, language)
+	if err == nil {
+		s.logger.Debug().Str("text", text).Str("found_form", word.Text).Msg("Word found in repository by form")
+		return word, nil
+	}
 
-	// If not found, fetch from external API
+	s.logger.Debug().Str("text", text).Str("language", language).Msg("Word not found in repository, fetching from API")
+
+	// If still not found, fetch from external API
 	word, err = s.dictAPI.FetchWord(ctx, text, language)
 	if err != nil {
 		s.logger.Error().Err(err).Str("text", text).Str("language", language).Msg("Failed to fetch word from API")
