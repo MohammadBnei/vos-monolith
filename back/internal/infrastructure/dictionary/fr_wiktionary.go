@@ -689,13 +689,9 @@ func (w *FrenchWiktionaryAPI) setupSynonymsCallback(c *colly.Collector, word *wo
 			}
 		}
 
-		// Create a colly HTMLElement for the synonym list
-		synonymListElem := &colly.HTMLElement{
-			DOM: synonymList,
-		}
-
-		synonymListElem.ForEach("li", func(_ int, li *colly.HTMLElement) {
-			synonym := strings.TrimSpace(li.Text)
+		// Use goquery to iterate through list items
+		synonymList.Find("li").Each(func(_ int, liSelection *goquery.Selection) {
+			synonym := strings.TrimSpace(liSelection.Text())
 			if synonym != "" {
 				w.logger.Debug().Str("synonym", synonym).Msg("Found synonym")
 				word.AddSynonym(synonym)
@@ -712,13 +708,9 @@ func (w *FrenchWiktionaryAPI) setupSynonymsCallback(c *colly.Collector, word *wo
 			// Look for the unordered list that contains synonyms
 			synonymList := e.DOM.Parent().Parent().Next()
 			if synonymList.Is("ul") {
-				// Create a colly HTMLElement for the synonym list
-				synonymListElem := &colly.HTMLElement{
-					DOM: synonymList,
-				}
-
-				synonymListElem.ForEach("li", func(_ int, li *colly.HTMLElement) {
-					synonym := strings.TrimSpace(li.Text)
+				// Use goquery to iterate through list items
+				synonymList.Find("li").Each(func(_ int, liSelection *goquery.Selection) {
+					synonym := strings.TrimSpace(liSelection.Text())
 					if synonym != "" {
 						w.logger.Debug().Str("synonym", synonym).Msg("Found synonym")
 						word.AddSynonym(synonym)
@@ -749,13 +741,9 @@ func (w *FrenchWiktionaryAPI) setupAntonymsCallback(c *colly.Collector, word *wo
 			}
 		}
 
-		// Create a colly HTMLElement for the antonym list
-		antonymListElem := &colly.HTMLElement{
-			DOM: antonymList,
-		}
-
-		antonymListElem.ForEach("li", func(_ int, li *colly.HTMLElement) {
-			antonym := strings.TrimSpace(li.Text)
+		// Use goquery to iterate through list items
+		antonymList.Find("li").Each(func(_ int, liSelection *goquery.Selection) {
+			antonym := strings.TrimSpace(liSelection.Text())
 			if antonym != "" {
 				w.logger.Debug().Str("antonym", antonym).Msg("Found antonym")
 				word.AddAntonym(antonym)
@@ -772,13 +760,9 @@ func (w *FrenchWiktionaryAPI) setupAntonymsCallback(c *colly.Collector, word *wo
 			// Look for the unordered list that contains antonyms
 			antonymList := e.DOM.Parent().Parent().Next()
 			if antonymList.Is("ul") {
-				// Create a colly HTMLElement for the antonym list
-				antonymListElem := &colly.HTMLElement{
-					DOM: antonymList,
-				}
-
-				antonymListElem.ForEach("li", func(_ int, li *colly.HTMLElement) {
-					antonym := strings.TrimSpace(li.Text)
+				// Use goquery to iterate through list items
+				antonymList.Find("li").Each(func(_ int, liSelection *goquery.Selection) {
+					antonym := strings.TrimSpace(liSelection.Text())
 					if antonym != "" {
 						w.logger.Debug().Str("antonym", antonym).Msg("Found antonym")
 						word.AddAntonym(antonym)
@@ -812,17 +796,11 @@ func (w *FrenchWiktionaryAPI) setupTranslationsCallback(c *colly.Collector, word
 			return
 		}
 
-		// Create a colly HTMLElement for the translations div
-		translationsDivElem := &colly.HTMLElement{
-			DOM: translationsDiv,
-		}
-
 		// Track which languages we've already processed
 		processedLangs := make(map[string]bool)
 
-		translationsDivElem.ForEach("li", func(_ int, li *colly.HTMLElement) {
-			// We need to use goquery for some operations
-			liSelection := li.DOM
+		// Use goquery to iterate through list items
+		translationsDiv.Find("li").Each(func(_ int, liSelection *goquery.Selection) {
 
 			langSpan := liSelection.Find("span[class^='trad-']").First()
 			langName := strings.TrimSpace(langSpan.Text())
@@ -838,7 +816,7 @@ func (w *FrenchWiktionaryAPI) setupTranslationsCallback(c *colly.Collector, word
 			translationText := ""
 
 			// Get the full text and try to extract the translation
-			fullText := strings.TrimSpace(li.Text)
+			fullText := strings.TrimSpace(liSelection.Text())
 
 			// Remove the language name and colon
 			for _, prefix := range []string{"Allemand", "Anglais", "Espagnol", "Italien", "Portugais", "Roumain"} {
@@ -876,17 +854,11 @@ func (w *FrenchWiktionaryAPI) setupTranslationsCallback(c *colly.Collector, word
 			// Translations are in a complex structure, navigate to find them
 			translationsDiv := e.DOM.Parent().Parent().Next()
 			if translationsDiv.HasClass("boite") {
-				// Create a colly HTMLElement for the translations div
-				translationsDivElem := &colly.HTMLElement{
-					DOM: translationsDiv,
-				}
-
 				// Track which languages we've already processed
 				processedLangs := make(map[string]bool)
 
-				translationsDivElem.ForEach("li", func(_ int, li *colly.HTMLElement) {
-					// We need to use goquery for some operations
-					liSelection := li.DOM
+				// Use goquery to iterate through list items
+				translationsDiv.Find("li").Each(func(_ int, liSelection *goquery.Selection) {
 
 					langSpan := liSelection.Find("span[class^='trad-']").First()
 					langName := strings.TrimSpace(langSpan.Text())
@@ -902,7 +874,7 @@ func (w *FrenchWiktionaryAPI) setupTranslationsCallback(c *colly.Collector, word
 					translationText := ""
 
 					// Get the full text and try to extract the translation
-					fullText := strings.TrimSpace(li.Text)
+					fullText := strings.TrimSpace(liSelection.Text())
 
 					// Remove the language name and colon
 					for _, prefix := range []string{"Allemand", "Anglais", "Espagnol", "Italien", "Portugais", "Roumain"} {
