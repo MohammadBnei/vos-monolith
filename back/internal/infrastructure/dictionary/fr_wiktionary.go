@@ -557,8 +557,24 @@ func (w *FrenchWiktionaryAPI) setupEtymologyCallback(c *colly.Collector, word *w
 		}
 
 		if etymologyText != "" {
-			w.logger.Debug().Str("etymology", etymologyText).Msg("Found etymology")
-			word.Etymology = etymologyText
+			// Remove "Étymologie manquante ou incomplète" and anything after it
+			if idx := strings.Index(etymologyText, "Étymologie manquante ou incomplète"); idx >= 0 {
+				// If there's content before the message, keep only that part
+				if idx > 0 {
+					etymologyText = strings.TrimSpace(etymologyText[:idx])
+				} else {
+					// If the message is at the beginning, there's no useful etymology
+					etymologyText = ""
+				}
+			}
+
+			// Only set etymology if there's still content after filtering
+			if etymologyText != "" {
+				w.logger.Debug().Str("etymology", etymologyText).Msg("Found etymology")
+				word.Etymology = etymologyText
+			} else {
+				w.logger.Debug().Msg("Etymology was only the 'missing' message, ignoring")
+			}
 		}
 	})
 }
