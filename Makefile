@@ -23,6 +23,14 @@ tidy: ## Run go mod tidy
 test: ## Run tests
 	cd back && go test -v ./...
 
+.PHONY: migrate
+migrate: ## Run database migrations
+	cd back && migrate -path internal/infrastructure/migrations -database "$${DATABASE_URL}" up
+
+.PHONY: migrate-down
+migrate-down: ## Rollback database migrations
+	cd back && migrate -path internal/infrastructure/migrations -database "$${DATABASE_URL}" down
+
 .PHONY: clean
 clean: ## Clean build artifacts
 	rm -rf $(BIN_DIR)
