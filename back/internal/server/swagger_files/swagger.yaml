@@ -99,6 +99,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  
+  /api/v1/words/{wordId}/related:
+    get:
+      tags:
+        - words
+      summary: Get related words
+      description: Retrieve words related to the specified word (synonyms, antonyms)
+      operationId: getRelatedWords
+      parameters:
+        - name: wordId
+          in: path
+          description: ID of the word to get related words for
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatedWordsResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Word not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /health:
     get:
       tags:
@@ -115,6 +155,48 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
 components:
   schemas:
+    Definition:
+      type: object
+      properties:
+        text:
+          type: string
+          description: The definition text
+        word_type:
+          type: string
+          description: Part of speech (noun, verb, adjective, etc.)
+        examples:
+          type: array
+          items:
+            type: string
+          description: Examples specific to this definition
+        register:
+          type: string
+          description: Register information (formal, informal, slang, etc.)
+        notes:
+          type: array
+          items:
+            type: string
+          description: Additional notes about this definition
+      required:
+        - text
+    
+    Form:
+      type: object
+      properties:
+        text:
+          type: string
+          description: The form text
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+          description: Grammatical attributes (e.g., number, tense, etc.)
+        is_lemma:
+          type: boolean
+          description: Whether this form is the lemma/base form
+      required:
+        - text
+    
     Word:
       type: object
       properties:
@@ -123,23 +205,25 @@ components:
           description: Unique identifier for the word
         text:
           type: string
-          description: The word text
+          description: The canonical form of the word
         language:
           type: string
           description: Language code (e.g., en, fr, es)
         definitions:
           type: array
           items:
-            type: string
+            $ref: '#/components/schemas/Definition'
           description: List of definitions
         examples:
           type: array
           items:
             type: string
-          description: List of usage examples
+          description: General usage examples not tied to a specific definition
         pronunciation:
-          type: string
-          description: Pronunciation guide
+          type: object
+          additionalProperties:
+            type: string
+          description: Different pronunciation formats (IPA, audio, etc.)
         etymology:
           type: string
           description: Etymology information
@@ -148,6 +232,21 @@ components:
           additionalProperties:
             type: string
           description: Translations to other languages
+        synonyms:
+          type: array
+          items:
+            type: string
+          description: List of synonyms
+        antonyms:
+          type: array
+          items:
+            type: string
+          description: List of antonyms
+        forms:
+          type: array
+          items:
+            $ref: '#/components/schemas/Form'
+          description: Different forms of the word
         created_at:
           type: string
           format: date-time
@@ -183,6 +282,21 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Word'
+    
+    RelatedWordsResponse:
+      type: object
+      properties:
+        source_word:
+          $ref: '#/components/schemas/Word'
+        synonyms:
+          type: array
+          items:
+            $ref: '#/components/schemas/Word'
+        antonyms:
+          type: array
+          items:
+            $ref: '#/components/schemas/Word'
+    
     ErrorResponse:
       type: object
       properties:
