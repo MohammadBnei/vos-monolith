@@ -136,9 +136,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		e.ForEach("li", func(_ int, li *colly.HTMLElement) {
 			sectionID := li.Attr("id")
 			if strings.HasPrefix(sectionID, "toc-") {
-				// Extract the language from the section
-				langSpan := li.ChildText("span.sectionlangue")
-				if langSpan == "Français" {
+				if strings.HasSuffix(sectionID, "Français") {
 					w.logger.Debug().Str("sectionID", sectionID).Msg("Found French section in TOC")
 					inFrenchSection = true
 
