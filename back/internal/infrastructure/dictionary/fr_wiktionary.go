@@ -439,6 +439,44 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// Wait until scraping is finished
 	c.Wait()
 
+	// Extract definitions from headword line
+	c.OnHTML("p span.headword-line", func(e *colly.HTMLElement) {
+		// Only process if we're in the French section
+		if !inFrenchSection {
+			return
+		}
+		
+		// If we haven't found definitions yet, try to extract from headword line
+		if !foundDefinitions {
+			// Get the definition from the headword line
+			definitionText := strings.TrimSpace(e.Text)
+			if definitionText != "" {
+				w.logger.Debug().Str("headwordLine", definitionText).Msg("Found headword line")
+				
+				// Extract gender information if present
+				if strings.Contains(definitionText, "f") || strings.Contains(definitionText, "m") {
+					gender := ""
+					if strings.Contains(definitionText, "f") {
+						gender = "feminine"
+					} else if strings.Contains(definitionText, "m") {
+						gender = "masculine"
+					}
+					if gender != "" && newWord.Gender == "" {
+						newWord.Gender = gender
+						w.logger.Debug().Str("gender", gender).Msg("Extracted gender from headword line")
+					}
+				}
+				
+				// If there's a definition in the headword line, add it
+				if strings.Contains(definitionText, "uncountable") {
+					newWord.Definitions = append(newWord.Definitions, "uncountable noun")
+					w.logger.Debug().Msg("Added 'uncountable noun' definition from headword line")
+					foundDefinitions = true
+				}
+			}
+		}
+	})
+
 	// If no definitions were found, try a more aggressive approach
 	if !foundDefinitions || len(newWord.Definitions) == 0 {
 		w.logger.Warn().Str("text", text).Str("language", language).Msg("No definitions found with standard selectors, trying fallback")
@@ -451,6 +489,18 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					definitionText := strings.TrimSpace(e.Text)
 					if definitionText != "" && len(definitionText) > 10 {
 						w.logger.Debug().Str("definition", definitionText).Msg("Found definition with fallback method")
+						newWord.Definitions = append(newWord.Definitions, definitionText)
+						foundDefinitions = true
+					}
+				}
+			})
+			
+			// Try to extract from any paragraph that might contain a definition
+			c.OnHTML("p", func(e *colly.HTMLElement) {
+				if !foundDefinitions {
+					definitionText := strings.TrimSpace(e.Text)
+					if definitionText != "" && len(definitionText) > 10 && !strings.HasPrefix(definitionText, "From") {
+						w.logger.Debug().Str("definition", definitionText).Msg("Found definition in paragraph with fallback method")
 						newWord.Definitions = append(newWord.Definitions, definitionText)
 						foundDefinitions = true
 					}
