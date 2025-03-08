@@ -4,8 +4,8 @@ import (
 	"time"
 )
 
-// WordForm represents a different form of a word with its attributes
-type WordForm struct {
+// Form represents a different form of a word with its attributes
+type Form struct {
 	Text       string            `json:"text"`
 	Attributes map[string]string `json:"attributes,omitempty"` // e.g. {"number": "plural", "tense": "past"}
 	IsLemma    bool              `json:"is_lemma,omitempty"`   // Whether this form is the lemma/base form
@@ -13,33 +13,33 @@ type WordForm struct {
 
 // Definition represents a single definition with its type and examples
 type Definition struct {
-	Text      string   `json:"text"`
-	WordType  string   `json:"word_type,omitempty"` // noun, verb, adjective, etc.
-	Examples  []string `json:"examples,omitempty"`
-	Register  string   `json:"register,omitempty"`  // formal, informal, slang, etc.
-	Notes     []string `json:"notes,omitempty"`
+	Text     string   `json:"text"`
+	WordType string   `json:"word_type,omitempty"` // noun, verb, adjective, etc.
+	Examples []string `json:"examples,omitempty"`
+	Register string   `json:"register,omitempty"` // formal, informal, slang, etc.
+	Notes    []string `json:"notes,omitempty"`
 }
 
 // Word represents a vocabulary word with its definitions and metadata
 type Word struct {
-	ID            string                 `json:"id"`
-	Text          string                 `json:"text"`           // The canonical form
-	Language      string                 `json:"language"`
-	Definitions   []Definition           `json:"definitions,omitempty"`
-	Examples      []string               `json:"examples,omitempty"` // General examples not tied to a specific definition
-	Pronunciation map[string]string      `json:"pronunciation,omitempty"` // Different pronunciation formats (IPA, audio URL, etc.)
-	Etymology     string                 `json:"etymology,omitempty"`
-	Translations  map[string]string      `json:"translations,omitempty"`
-	Synonyms      []string               `json:"synonyms,omitempty"`
-	Antonyms      []string               `json:"antonyms,omitempty"`
-	WordType      string                 `json:"word_type,omitempty"` // Primary word type if multiple exist
-	Gender        string                 `json:"gender,omitempty"`
-	WordForms     []WordForm             `json:"word_forms,omitempty"`
-	SearchTerms   []string               `json:"search_terms,omitempty"` // All searchable forms of the word
-	Lemma         string                 `json:"lemma,omitempty"`        // Base form of the word
-	UsageNotes    []string               `json:"usage_notes,omitempty"`  // General usage information
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
+	ID            string            `json:"id"`
+	Text          string            `json:"text"` // The canonical form
+	Language      string            `json:"language"`
+	Definitions   []Definition      `json:"definitions,omitempty"`
+	Examples      []string          `json:"examples,omitempty"`      // General examples not tied to a specific definition
+	Pronunciation map[string]string `json:"pronunciation,omitempty"` // Different pronunciation formats (IPA, audio URL, etc.)
+	Etymology     string            `json:"etymology,omitempty"`
+	Translations  map[string]string `json:"translations,omitempty"`
+	Synonyms      []string          `json:"synonyms,omitempty"`
+	Antonyms      []string          `json:"antonyms,omitempty"`
+	WordType      string            `json:"word_type,omitempty"` // Primary word type if multiple exist
+	Gender        string            `json:"gender,omitempty"`
+	Forms         []Form            `json:"forms,omitempty"`
+	SearchTerms   []string          `json:"search_terms,omitempty"` // All searchable forms of the word
+	Lemma         string            `json:"lemma,omitempty"`        // Base form of the word
+	UsageNotes    []string          `json:"usage_notes,omitempty"`  // General usage information
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
 }
 
 // NewWord creates a new Word entity
@@ -54,7 +54,7 @@ func NewWord(text, language string) *Word {
 		Synonyms:      []string{},
 		Antonyms:      []string{},
 		Translations:  make(map[string]string),
-		WordForms:     []WordForm{},
+		Forms:         []Form{},
 		SearchTerms:   []string{text}, // Initialize with the main text as a search term
 		UsageNotes:    []string{},
 		CreatedAt:     now,
@@ -65,7 +65,7 @@ func NewWord(text, language string) *Word {
 // AddWordForm adds a new form of the word and updates search terms
 func (w *Word) AddWordForm(text string, attributes map[string]string, isLemma bool) {
 	// Add the form to WordForms
-	w.WordForms = append(w.WordForms, WordForm{
+	w.Forms = append(w.Forms, Form{
 		Text:       text,
 		Attributes: attributes,
 		IsLemma:    isLemma,
@@ -95,7 +95,7 @@ func (w *Word) AddWordForm(text string, attributes map[string]string, isLemma bo
 // SetLemma sets the lemma (base form) of the word
 func (w *Word) SetLemma(lemma string) {
 	w.Lemma = lemma
-	
+
 	// If the lemma is not already in search terms, add it
 	found := false
 	for _, term := range w.SearchTerms {
@@ -119,12 +119,12 @@ func (w *Word) AddDefinition(text, wordType string, examples []string) {
 		WordType: wordType,
 		Examples: examples,
 	})
-	
+
 	// Update the primary word type if not set
 	if w.WordType == "" && wordType != "" {
 		w.WordType = wordType
 	}
-	
+
 	// Update the UpdatedAt timestamp
 	w.UpdatedAt = time.Now()
 }
@@ -137,7 +137,7 @@ func (w *Word) AddSynonym(synonym string) {
 			return
 		}
 	}
-	
+
 	w.Synonyms = append(w.Synonyms, synonym)
 	w.UpdatedAt = time.Now()
 }
@@ -150,7 +150,7 @@ func (w *Word) AddAntonym(antonym string) {
 			return
 		}
 	}
-	
+
 	w.Antonyms = append(w.Antonyms, antonym)
 	w.UpdatedAt = time.Now()
 }

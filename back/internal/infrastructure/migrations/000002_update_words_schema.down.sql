@@ -8,7 +8,7 @@ ALTER TABLE words
 
 -- Drop the new columns
 ALTER TABLE words 
-  DROP COLUMN IF EXISTS word_forms,
+  DROP COLUMN IF EXISTS forms,
   DROP COLUMN IF EXISTS search_terms,
   DROP COLUMN IF EXISTS lemma,
   DROP COLUMN IF EXISTS word_type;

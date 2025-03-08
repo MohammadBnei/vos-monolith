@@ -32,7 +32,7 @@ func NewWordRepository(db *pgxpool.Pool, logger zerolog.Logger) *WordRepository 
 func (r *WordRepository) FindByText(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
-		       word_type, word_forms, search_terms, lemma, created_at, updated_at
+		       word_type, forms, search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE text = $1 AND language = $2
 	`
@@ -72,7 +72,7 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 	}
 
 	// Parse word forms JSON
-	if err := json.Unmarshal(wordFormsJSON, &w.WordForms); err != nil {
+	if err := json.Unmarshal(wordFormsJSON, &w.Forms); err != nil {
 		return nil, fmt.Errorf("failed to parse word forms: %w", err)
 	}
 
@@ -87,7 +87,7 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
-		       word_type, word_forms, search_terms, lemma, created_at, updated_at
+		       word_type, forms, search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE language = $1 AND $2 = ANY(search_terms)
 	`
@@ -127,7 +127,7 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 	}
 
 	// Parse word forms JSON
-	if err := json.Unmarshal(wordFormsJSON, &w.WordForms); err != nil {
+	if err := json.Unmarshal(wordFormsJSON, &w.Forms); err != nil {
 		return nil, fmt.Errorf("failed to parse word forms: %w", err)
 	}
 
@@ -143,7 +143,7 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 	query := `
 		INSERT INTO words (
 			text, language, definitions, examples, pronunciation, etymology, translations, 
-			word_type, word_forms, search_terms, lemma, created_at, updated_at
+			word_type, forms, search_terms, lemma, created_at, updated_at
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (text, language) 
@@ -154,7 +154,7 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 			etymology = $6,
 			translations = $7,
 			word_type = $8,
-			word_forms = $9,
+			forms = $9,
 			search_terms = $10,
 			lemma = $11,
 			updated_at = $13
@@ -174,7 +174,7 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 	}
 
 	// Convert word forms to JSON
-	wordFormsJSON, err := json.Marshal(w.WordForms)
+	wordFormsJSON, err := json.Marshal(w.Forms)
 	if err != nil {
 		return fmt.Errorf("failed to marshal word forms: %w", err)
 	}
@@ -201,7 +201,7 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 	// Build query with filters
 	query := `
 		SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
-		       word_type, word_forms, search_terms, lemma, created_at, updated_at
+		       word_type, forms, search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE 1=1
 	`
@@ -268,7 +268,7 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 		}
 
 		// Parse word forms JSON
-		if err := json.Unmarshal(wordFormsJSON, &w.WordForms); err != nil {
+		if err := json.Unmarshal(wordFormsJSON, &w.Forms); err != nil {
 			return nil, fmt.Errorf("failed to parse word forms: %w", err)
 		}
 

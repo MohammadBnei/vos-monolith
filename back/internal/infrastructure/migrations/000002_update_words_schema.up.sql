@@ -1,11 +1,11 @@
 -- Add new columns for enhanced word structure
 ALTER TABLE words 
   ADD COLUMN IF NOT EXISTS word_type TEXT,
-  ADD COLUMN IF NOT EXISTS word_forms JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS forms JSONB DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS search_terms TEXT[] DEFAULT ARRAY[]::TEXT[],
   ADD COLUMN IF NOT EXISTS lemma TEXT;
 
--- Drop the gender column as it's replaced by word_forms
+-- Drop the gender column as it's replaced by forms
 ALTER TABLE words DROP COLUMN IF EXISTS gender;
 
 -- Create an index on search_terms for efficient searching
@@ -20,6 +20,6 @@ ALTER TABLE words
     ));
 
 COMMENT ON COLUMN words.definitions IS 'Word definitions with type information';
-COMMENT ON COLUMN words.word_forms IS 'Different forms of the word with attributes';
+COMMENT ON COLUMN words.forms IS 'Different forms of the word with attributes';
 COMMENT ON COLUMN words.search_terms IS 'All searchable forms of the word';
 COMMENT ON COLUMN words.lemma IS 'Base form of the word';
