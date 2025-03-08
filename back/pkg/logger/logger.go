@@ -49,8 +49,14 @@ type Config struct {
 
 // DefaultConfig returns a default configuration
 func DefaultConfig() Config {
+	// Determine environment from ENV variable
+	env := EnvDevelopment
+	if os.Getenv("ENV") == "production" {
+		env = EnvProduction
+	}
+
 	return Config{
-		Environment: EnvDevelopment,
+		Environment: env,
 		Level:       LevelInfo,
 		Output:      os.Stdout,
 	}

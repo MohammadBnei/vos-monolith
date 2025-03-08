@@ -31,11 +31,6 @@ func run() error {
 	logConfig := logger.DefaultConfig()
 	logConfig.Level = cfg.LogLevel
 	
-	// Use JSON format in production
-	if os.Getenv("GO_ENV") == "production" {
-		logConfig.Environment = logger.EnvProduction
-	}
-	
 	log := logger.NewWithConfig(logConfig)
 	log.Info().Str("app", cfg.AppName).Msg("Starting application")
 
