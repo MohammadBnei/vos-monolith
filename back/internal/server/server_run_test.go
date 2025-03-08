@@ -24,9 +24,11 @@ func TestServerRunAndShutdown(t *testing.T) {
 	}
 	
 	// Use a real logger for this test
-	log := &zerologLogger{
-		zerolog.New(zerolog.NewTestWriter(t)).Level(zerolog.DebugLevel),
-	}
+	log := zerolog.New(zerolog.NewConsoleWriter()).
+		Level(zerolog.DebugLevel).
+		With().
+		Timestamp().
+		Logger()
 	
 	server := NewServer(cfg, log)
 	
@@ -46,37 +48,4 @@ func TestServerRunAndShutdown(t *testing.T) {
 	// Shutdown the server
 	err = server.Shutdown()
 	assert.NoError(t, err)
-}
-
-// zerologLogger is a simple implementation of logger.Logger for testing
-type zerologLogger struct {
-	zerolog.Logger
-}
-
-func (l *zerologLogger) Debug() *zerolog.Event {
-	return l.Logger.Debug()
-}
-
-func (l *zerologLogger) Info() *zerolog.Event {
-	return l.Logger.Info()
-}
-
-func (l *zerologLogger) Warn() *zerolog.Event {
-	return l.Logger.Warn()
-}
-
-func (l *zerologLogger) Error() *zerolog.Event {
-	return l.Logger.Error()
-}
-
-func (l *zerologLogger) Fatal() *zerolog.Event {
-	return l.Logger.Fatal()
-}
-
-func (l *zerologLogger) Panic() *zerolog.Event {
-	return l.Logger.Panic()
-}
-
-func (l *zerologLogger) With() zerolog.Context {
-	return l.Logger.With()
 }
