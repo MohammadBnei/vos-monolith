@@ -1,1 +1,15 @@
+# Binaries
+/bin/
+
+# Air configuration
+.air.toml
+
+# IDE specific files
+.vscode/
+.idea/
+
+# Go workspace file
+go.work
+
+# Aider files
 .aider*

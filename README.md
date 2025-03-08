@@ -1,4 +1,4 @@
-# Vocabulary Learning App
+# Voc on Steroid - Vocabulary Learning App
 
 ## Overview
 
