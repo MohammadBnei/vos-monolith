@@ -4,9 +4,10 @@
 
 1. [General Principles](#general-principles)
 2. [Clean Architecture Rules](#clean-architecture-rules)
-3. [Uber Go Guidelines](#uber-go-guidelines)
-4. [Testing Strategy](#testing-strategy)
-5. [Documentation Standards](#documentation-standards)
+3. [SOLID Principles](#solid-principles)
+4. [Uber Go Guidelines](#uber-go-guidelines)
+5. [Testing Strategy](#testing-strategy)
+6. [Documentation Standards](#documentation-standards)
 
 ## General Principles
 
@@ -53,6 +54,35 @@
 - Database implementations
 - Web frameworks
 - File systems
+
+## SOLID Principles
+
+The SOLID principles provide a foundation for writing maintainable, scalable, and testable code.
+
+### Single Responsibility Principle (SRP)
+
+- Each package or component should have one primary responsibility.
+- Avoid mixing concerns in a single package.
+
+### Open/Closed Principle
+
+- Components should be open for extension but closed for modification.
+- Use interfaces and composition to allow for extensibility.
+
+### Liskov Substitution Principle (LSP)
+
+- Objects should be replaceable with their subtype implementations without altering system behavior.
+- Adhere to interface contracts when substituting dependencies.
+
+### Interface Segregation Principle (ISP)
+
+- Define small, focused interfaces that reflect the responsibilities of a component.
+- Avoid large, monolithic interfaces that force components into unintended roles.
+
+### Dependency Inversion Principle (DIP)
+
+- Depend on abstractions rather than concrete implementations.
+- Use dependency injection or inversion of control to decouple components.
 
 ## Uber Go Guidelines
 
