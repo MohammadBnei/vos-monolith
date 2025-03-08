@@ -54,15 +54,16 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	var inFrenchSection bool = false
 
 	// First, identify the French language section - try multiple selectors
-	c.OnHTML("h2, div.mw-heading-2", func(e *colly.HTMLElement) {
+	c.OnHTML("h2, div.mw-heading-2, div.mw-heading.mw-heading2", func(e *colly.HTMLElement) {
 		// Check if this is the French language section header
 		sectionText := e.ChildText("span.sectionlangue")
-		w.logger.Debug().Str("sectionText", sectionText).Str("element", e.Name).Msg("Found language section")
+		headingText := e.Text
+		w.logger.Debug().Str("sectionText", sectionText).Str("headingText", headingText).Str("element", e.Name).Msg("Found language section")
 
-		if sectionText == "Français" {
+		if sectionText == "Français" || headingText == "French" {
 			inFrenchSection = true
 			w.logger.Debug().Msg("Found French language section")
-		} else if sectionText != "" {
+		} else if sectionText != "" || (headingText != "" && headingText != "Etymology" && headingText != "Noun" && headingText != "Declension") {
 			// If we find another language section after French, stop processing
 			if inFrenchSection {
 				inFrenchSection = false
@@ -72,7 +73,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	})
 
 	// Extract etymology
-	c.OnHTML("div.mw-heading-3:has(span.titreetym) + dl", func(e *colly.HTMLElement) {
+	c.OnHTML("div.mw-heading-3:has(span.titreetym) + dl, div.mw-heading.mw-heading3#Etymology + p", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
@@ -90,30 +91,34 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		w.logger.Debug().Msg("Page loaded successfully")
 
 		// Debug the structure to find French section
-		e.ForEach("h2, div.mw-heading-2", func(_ int, h *colly.HTMLElement) {
+		e.ForEach("h2, div.mw-heading-2, div.mw-heading.mw-heading2", func(_ int, h *colly.HTMLElement) {
 			sectionText := h.ChildText("span.sectionlangue")
+			headingText := h.Text
 			w.logger.Debug().
 				Str("element", h.Name).
 				Str("id", h.Attr("id")).
 				Str("class", h.Attr("class")).
 				Str("sectionText", sectionText).
+				Str("headingText", headingText).
 				Msg("Found heading element")
 		})
 
 		// Debug definition sections
-		e.ForEach("div.mw-heading-3, h3", func(_ int, h *colly.HTMLElement) {
+		e.ForEach("div.mw-heading-3, h3, div.mw-heading.mw-heading3", func(_ int, h *colly.HTMLElement) {
 			titleText := h.ChildText("span.titredef, span.titreetym, span.titresyno")
+			headingText := h.Text
 			w.logger.Debug().
 				Str("element", h.Name).
 				Str("id", h.Attr("id")).
 				Str("class", h.Attr("class")).
 				Str("titleText", titleText).
+				Str("headingText", headingText).
 				Msg("Found potential definition section")
 		})
 	})
 
 	// Extract word type (masculine/feminine) and plural form from the flextable
-	c.OnHTML("table.flextable-fr-mfsp, p span.ligne-de-forme", func(e *colly.HTMLElement) {
+	c.OnHTML("table.flextable-fr-mfsp, p span.ligne-de-forme, table.inflection-table, span.gender", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
@@ -121,24 +126,48 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 		// Check if this is a table with plural information
 		if e.Name == "table" {
-			e.ForEach("tr", func(_ int, tr *colly.HTMLElement) {
-				if strings.Contains(tr.Text, "Pluriel") {
-					tr.ForEach("td", func(_ int, td *colly.HTMLElement) {
-						plural := strings.TrimSpace(td.Text)
-						if plural != "" && plural != newWord.Text {
-							// Store plural in translations as a special case
-							w.logger.Debug().Str("plural", plural).Msg("Found plural form")
-							newWord.Translations["plural"] = plural
-						}
-					})
-				}
-			})
+			if e.HasClass("flextable-fr-mfsp") {
+				e.ForEach("tr", func(_ int, tr *colly.HTMLElement) {
+					if strings.Contains(tr.Text, "Pluriel") {
+						tr.ForEach("td", func(_ int, td *colly.HTMLElement) {
+							plural := strings.TrimSpace(td.Text)
+							if plural != "" && plural != newWord.Text {
+								// Store plural in translations as a special case
+								w.logger.Debug().Str("plural", plural).Msg("Found plural form")
+								newWord.Translations["plural"] = plural
+							}
+						})
+					}
+				})
+			} else if e.HasClass("inflection-table") {
+				// Extract plural from declension table
+				e.ForEach("tr", func(_ int, tr *colly.HTMLElement) {
+					if strings.Contains(tr.Text, "plural") {
+						tr.ForEach("td", func(_ int, td *colly.HTMLElement) {
+							plural := strings.TrimSpace(td.Text)
+							if plural != "" && plural != newWord.Text {
+								w.logger.Debug().Str("plural", plural).Msg("Found plural form from declension table")
+								newWord.Translations["plural"] = plural
+							}
+						})
+					}
+				})
+			}
 		} else if e.Name == "span" {
-			// Extract word type (masculin/féminin)
-			wordType := strings.TrimSpace(e.Text)
-			if strings.Contains(wordType, "masculin") || strings.Contains(wordType, "féminin") {
-				w.logger.Debug().Str("wordType", wordType).Msg("Found word type")
-				newWord.Gender = wordType
+			if e.HasClass("ligne-de-forme") {
+				// Extract word type (masculin/féminin)
+				wordType := strings.TrimSpace(e.Text)
+				if strings.Contains(wordType, "masculin") || strings.Contains(wordType, "féminin") {
+					w.logger.Debug().Str("wordType", wordType).Msg("Found word type")
+					newWord.Gender = wordType
+				}
+			} else if e.HasClass("gender") {
+				// Extract gender information
+				gender := strings.TrimSpace(e.Text)
+				if gender != "" {
+					w.logger.Debug().Str("gender", gender).Msg("Found gender")
+					newWord.Gender = gender
+				}
 			}
 		}
 	})
@@ -161,13 +190,16 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Track sections to know when we're in definitions, synonyms, etc.
 	// Handle both div.mw-heading-3 and h3 elements that might contain section headings
-	c.OnHTML("div.mw-heading-3, h3", func(e *colly.HTMLElement) {
+	c.OnHTML("div.mw-heading-3, h3, div.mw-heading.mw-heading3", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
 		}
 
 		titleDef := e.ChildText("span.titredef")
+		headingText := e.Text
+		headingID := e.Attr("id")
+		
 		if titleDef != "" {
 			w.logger.Debug().Str("section", titleDef).Msg("Found definition section")
 			currentSection = "definitions"
@@ -176,6 +208,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		} else if e.ChildText("span.titresyno") != "" {
 			currentSection = "synonyms"
 			inDefinitionList = false
+		} else if headingText == "Noun" || headingID == "Noun" {
+			w.logger.Debug().Str("section", "Noun").Msg("Found noun section")
+			currentSection = "definitions"
+			inDefinitionList = false
+			currentDefinitionIndex = 0
 		} else {
 			// Don't reset the section if we're not recognizing a new one
 			// This helps maintain context between different HTML elements
@@ -204,7 +241,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Extract definitions from any ordered list following a definition heading
 	// This handles various HTML structures that might contain definitions
-	c.OnHTML("div.mw-heading-3:has(span.titredef) + p + ol, div.mw-heading-3:has(span.titredef) + ol, h3:has(span.titredef) + ol, h3:has(span.titredef) + p + ol, ol", func(e *colly.HTMLElement) {
+	c.OnHTML("div.mw-heading-3:has(span.titredef) + p + ol, div.mw-heading-3:has(span.titredef) + ol, h3:has(span.titredef) + ol, h3:has(span.titredef) + p + ol, ol, div.mw-heading.mw-heading3#Noun + ol, div.mw-heading.mw-heading3#Noun + p + ol", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
@@ -336,7 +373,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	})
 
 	// Additional backup method to find definitions in paragraphs
-	c.OnHTML("div.mw-heading-3:has(span.titredef) ~ p, h3:has(span.titredef) ~ p", func(e *colly.HTMLElement) {
+	c.OnHTML("div.mw-heading-3:has(span.titredef) ~ p, h3:has(span.titredef) ~ p, div.mw-heading.mw-heading3#Noun ~ p, div.mw-heading.mw-heading3#Noun + p", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
