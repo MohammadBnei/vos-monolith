@@ -46,11 +46,10 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Track if we found any definitions
 	foundDefinitions := false
-	
+
 	// Track the current section
 	var currentSection string
 	var inDefinitionList bool
-	var currentDefinitionIndex int
 
 	// Extract etymology
 	c.OnHTML("div.mw-heading-3:has(span.titreetym) + dl", func(e *colly.HTMLElement) {
@@ -90,7 +89,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if e.ChildText("span.titredef") != "" {
 			currentSection = "definitions"
 			inDefinitionList = false
-			currentDefinitionIndex = 0
 		} else if e.ChildText("span.titresyno") != "" {
 			currentSection = "synonyms"
 			inDefinitionList = false
@@ -107,16 +105,15 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 			e.ForEach("li", func(i int, li *colly.HTMLElement) {
 				// Get the main definition text (excluding nested elements)
 				definitionText := strings.TrimSpace(li.Text)
-				
+
 				// Skip empty definitions
 				if definitionText == "" {
 					return
 				}
-				
+
 				// Add the definition
 				newWord.Definitions = append(newWord.Definitions, definitionText)
-				currentDefinitionIndex = len(newWord.Definitions) - 1
-				
+
 				// Look for examples within this definition
 				li.ForEach("ul li span.example", func(_ int, example *colly.HTMLElement) {
 					exampleText := strings.TrimSpace(example.Text)
@@ -127,7 +124,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						newWord.Examples = append(newWord.Examples, exampleText)
 					}
 				})
-				
+
 				foundDefinitions = true
 			})
 		}
