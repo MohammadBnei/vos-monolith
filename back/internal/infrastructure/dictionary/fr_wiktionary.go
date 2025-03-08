@@ -119,32 +119,32 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Create a new word
 	newWord := wordDomain.NewWord(text, language)
-	
+
 	// First pass: Extract the table of contents to understand the page structure
 	pageStructure, err := w.extractPageStructure(ctx, text, language)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// If no French section was found, return an error
 	if !pageStructure.HasFrenchSection {
 		w.logger.Warn().Str("text", text).Str("language", language).Msg("No French section found")
 		return nil, fmt.Errorf("no French section found: %w", wordDomain.ErrWordNotFound)
 	}
-	
+
 	w.logger.Debug().
 		Str("text", text).
 		Int("sections", len(pageStructure.SectionIDs)).
 		Int("wordTypeSections", len(pageStructure.WordTypeSections)).
 		Int("otherSections", len(pageStructure.OtherSections)).
 		Msg("Page structure extracted")
-	
+
 	// Second pass: Extract the word information based on the page structure
 	foundDefinitions, err := w.extractWordInformation(ctx, newWord, pageStructure, text, language)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// If still no definitions, return error
 	if !foundDefinitions || len(newWord.Definitions) == 0 {
 		w.logger.Warn().Str("text", text).Str("language", language).Msg("No word data found")
@@ -175,14 +175,14 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 
 	// Set timeout
 	c.SetRequestTimeout(10 * time.Second)
-	
+
 	// Add rate limiting to avoid being blocked
 	c.Limit(&colly.LimitRule{
 		DomainGlob:  "*.wiktionary.org",
 		Delay:       1 * time.Second,
 		RandomDelay: 500 * time.Millisecond,
 	})
-	
+
 	// Initialize the page structure
 	pageStructure := &PageStructure{
 		SectionIDs:       make(map[string]string),
@@ -190,7 +190,7 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 		WordTypeSections: make(map[string]string),
 		OtherSections:    make(map[string]string),
 	}
-	
+
 	// Setup the callback for the table of contents
 	c.OnHTML("#mw-panel-toc-list", func(e *colly.HTMLElement) {
 		w.logger.Debug().Msg("Found table of contents")
@@ -199,11 +199,11 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 		e.ForEach("li", func(_ int, li *colly.HTMLElement) {
 			sectionID := li.Attr("id")
 			sectionTitle := li.ChildText("span.vector-toc-text span:last-child")
-			
+
 			if strings.HasPrefix(sectionID, "toc-") {
 				actualID := strings.TrimPrefix(sectionID, "toc-")
 				pageStructure.SectionIDs[sectionTitle] = actualID
-				
+
 				// Check if this is the French section
 				if strings.Contains(sectionTitle, "Français") {
 					w.logger.Debug().Str("sectionID", sectionID).Msg("Found French section in TOC")
@@ -213,17 +213,17 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 					li.ForEach("ul li", func(_ int, subLi *colly.HTMLElement) {
 						subSectionID := subLi.Attr("id")
 						subSectionTitle := subLi.ChildText("span.vector-toc-text span:last-child")
-						
+
 						if strings.HasPrefix(subSectionID, "toc-") {
 							actualSubID := strings.TrimPrefix(subSectionID, "toc-")
 							pageStructure.SectionIDs[subSectionTitle] = actualSubID
-							
+
 							// Categorize the section
 							switch {
-							case strings.Contains(subSectionTitle, "Nom") || 
-								 strings.Contains(subSectionTitle, "Verbe") || 
-								 strings.Contains(subSectionTitle, "Adjectif") || 
-								 strings.Contains(subSectionTitle, "Adverbe"):
+							case strings.Contains(subSectionTitle, "Nom") ||
+								strings.Contains(subSectionTitle, "Verbe") ||
+								strings.Contains(subSectionTitle, "Adjectif") ||
+								strings.Contains(subSectionTitle, "Adverbe"):
 								pageStructure.WordTypeSections[subSectionTitle] = actualSubID
 							case strings.Contains(subSectionTitle, "Étymologie"):
 								pageStructure.OtherSections["etymology"] = actualSubID
@@ -233,18 +233,18 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 								// Other sections
 								pageStructure.OtherSections[subSectionTitle] = actualSubID
 							}
-							
+
 							w.logger.Debug().Str("title", subSectionTitle).Str("id", actualSubID).Msg("Found subsection")
 
 							// Parse deeper levels (definitions, synonyms, etc.)
 							subLi.ForEach("ul li", func(_ int, subSubLi *colly.HTMLElement) {
 								subSubSectionID := subSubLi.Attr("id")
 								subSubSectionTitle := subSubLi.ChildText("span.vector-toc-text span:last-child")
-								
+
 								if strings.HasPrefix(subSubSectionID, "toc-") {
 									actualSubSubID := strings.TrimPrefix(subSubSectionID, "toc-")
 									pageStructure.SectionIDs[subSubSectionTitle] = actualSubSubID
-									
+
 									// Categorize the subsection
 									switch {
 									case strings.Contains(subSubSectionTitle, "Synonymes"):
@@ -264,7 +264,7 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 									case strings.Contains(subSubSectionTitle, "Références"):
 										pageStructure.OtherSections["references"] = actualSubSubID
 									}
-									
+
 									w.logger.Debug().Str("title", subSubSectionTitle).Str("id", actualSubSubID).Msg("Found sub-subsection")
 								}
 							})
@@ -280,26 +280,26 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 		// Only run this if we haven't found a French section yet
 		if !pageStructure.HasFrenchSection {
 			w.logger.Debug().Msg("No TOC found, looking for sections directly")
-			
+
 			// Look for section headings
 			e.ForEach("h2, h3, h4", func(_ int, heading *colly.HTMLElement) {
 				headingText := strings.TrimSpace(heading.Text)
 				headingID := heading.Attr("id")
-				
+
 				// Check if this is the French section
 				if strings.Contains(headingText, "Français") {
 					w.logger.Debug().Str("headingID", headingID).Msg("Found French section directly")
 					pageStructure.HasFrenchSection = true
 					pageStructure.SectionIDs[headingText] = headingID
 				}
-				
+
 				// If we're already in the French section, categorize subsections
 				if pageStructure.HasFrenchSection && heading.Name == "h3" {
 					switch {
-					case strings.Contains(headingText, "Nom") || 
-						 strings.Contains(headingText, "Verbe") || 
-						 strings.Contains(headingText, "Adjectif") || 
-						 strings.Contains(headingText, "Adverbe"):
+					case strings.Contains(headingText, "Nom") ||
+						strings.Contains(headingText, "Verbe") ||
+						strings.Contains(headingText, "Adjectif") ||
+						strings.Contains(headingText, "Adverbe"):
 						pageStructure.WordTypeSections[headingText] = headingID
 					case strings.Contains(headingText, "Étymologie"):
 						pageStructure.OtherSections["etymology"] = headingID
@@ -309,10 +309,10 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 						// Other sections
 						pageStructure.OtherSections[headingText] = headingID
 					}
-					
+
 					w.logger.Debug().Str("title", headingText).Str("id", headingID).Msg("Found section directly")
 				}
-				
+
 				// If we're in a word type section, look for subsections
 				if pageStructure.HasFrenchSection && heading.Name == "h4" {
 					switch {
@@ -323,13 +323,13 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 					case strings.Contains(headingText, "Traductions"):
 						pageStructure.OtherSections["translations"] = headingID
 					}
-					
+
 					w.logger.Debug().Str("title", headingText).Str("id", headingID).Msg("Found subsection directly")
 				}
 			})
 		}
 	})
-	
+
 	// Build URL for the web page
 	baseURL := w.getBaseURL(language)
 	url := fmt.Sprintf("%s/%s", baseURL, text)
@@ -349,7 +349,7 @@ func (w *FrenchWiktionaryAPI) extractPageStructure(ctx context.Context, text, la
 
 	// Wait until scraping is finished
 	c.Wait()
-	
+
 	return pageStructure, nil
 }
 
@@ -363,52 +363,52 @@ func (w *FrenchWiktionaryAPI) extractWordInformation(ctx context.Context, word *
 
 	// Set timeout
 	c.SetRequestTimeout(10 * time.Second)
-	
+
 	// Add rate limiting to avoid being blocked
 	c.Limit(&colly.LimitRule{
 		DomainGlob:  "*.wiktionary.org",
 		Delay:       1 * time.Second,
 		RandomDelay: 500 * time.Millisecond,
 	})
-	
+
 	// Track if we found any definitions
 	foundDefinitions := false
-	
+
 	// Track seen examples to avoid duplicates
 	seenExamples := make(map[string]bool)
-	
+
 	// Setup callbacks for basic word information
 	w.setupWordFormsCallback(c, word)
 	w.setupGenderCallback(c, word)
 	w.setupPronunciationCallback(c, word, pageStructure)
-	
+
 	// Setup callbacks for sections based on the page structure
 	if etymologyID, ok := pageStructure.OtherSections["etymology"]; ok {
 		w.setupEtymologyCallback(c, word, etymologyID)
 	}
-	
+
 	// Setup callbacks for word type sections (noun, verb, etc.)
 	for sectionTitle, sectionID := range pageStructure.WordTypeSections {
 		wordType := w.determineWordType(sectionTitle)
 		w.setupDefinitionsCallback(c, word, sectionID, wordType, &foundDefinitions, seenExamples)
 	}
-	
+
 	// Setup callbacks for other sections
 	if synonymsID, ok := pageStructure.OtherSections["synonyms"]; ok {
 		w.setupSynonymsCallback(c, word, synonymsID)
 	}
-	
+
 	if antonymsID, ok := pageStructure.OtherSections["antonyms"]; ok {
 		w.setupAntonymsCallback(c, word, antonymsID)
 	}
-	
+
 	if translationsID, ok := pageStructure.OtherSections["translations"]; ok {
 		w.setupTranslationsCallback(c, word, translationsID)
 	}
-	
+
 	// Setup fallback callback for definitions if none are found
 	w.setupFallbackDefinitionsCallback(c, word, &foundDefinitions, seenExamples)
-	
+
 	// Build URL for the web page
 	baseURL := w.getBaseURL(language)
 	url := fmt.Sprintf("%s/%s", baseURL, text)
@@ -428,7 +428,7 @@ func (w *FrenchWiktionaryAPI) extractWordInformation(ctx context.Context, word *
 
 	// Wait until scraping is finished
 	c.Wait()
-	
+
 	return foundDefinitions, nil
 }
 
@@ -510,7 +510,7 @@ func (w *FrenchWiktionaryAPI) setupPronunciationCallback(c *colly.Collector, wor
 		selector := fmt.Sprintf("#%s", pronunciationID)
 		c.OnHTML(selector, func(e *colly.HTMLElement) {
 			w.logger.Debug().Str("selector", selector).Msg("Found pronunciation section")
-			
+
 			// Look for IPA notation in this section
 			e.DOM.Parent().Next().Find("span.API").Each(func(_ int, span *goquery.Selection) {
 				pronunciation := strings.TrimSpace(span.Text())
@@ -524,7 +524,7 @@ func (w *FrenchWiktionaryAPI) setupPronunciationCallback(c *colly.Collector, wor
 			})
 		})
 	}
-	
+
 	// Also try the general API span as a fallback
 	c.OnHTML("span.API", func(e *colly.HTMLElement) {
 		// Only set if we haven't already found it in a section
@@ -642,13 +642,13 @@ func (w *FrenchWiktionaryAPI) setupDefinitionsCallback(c *colly.Collector, word 
 						// Clean up the example text
 						exampleText = strings.ReplaceAll(exampleText, "« ", "")
 						exampleText = strings.ReplaceAll(exampleText, " »", "")
-						
+
 						// Only add if we haven't seen this example before
 						if !seenExamples[exampleText] {
 							w.logger.Debug().Str("example", exampleText).Msg("Found example")
 							examples = append(examples, exampleText)
 							seenExamples[exampleText] = true
-							
+
 							// Also add to the word's general examples
 							word.Examples = append(word.Examples, exampleText)
 						}
@@ -678,7 +678,7 @@ func (w *FrenchWiktionaryAPI) setupSynonymsCallback(c *colly.Collector, word *wo
 
 		// Look for the unordered list that contains synonyms
 		var synonymList *goquery.Selection
-		
+
 		// Look for the next ul
 		synonymList = e.DOM.Parent().Next()
 		if !synonymList.Is("ul") {
@@ -702,7 +702,7 @@ func (w *FrenchWiktionaryAPI) setupSynonymsCallback(c *colly.Collector, word *wo
 			}
 		})
 	})
-	
+
 	// Also try the span.titresyno as a fallback
 	c.OnHTML("span.titresyno", func(e *colly.HTMLElement) {
 		// Only process if we don't already have synonyms
@@ -738,7 +738,7 @@ func (w *FrenchWiktionaryAPI) setupAntonymsCallback(c *colly.Collector, word *wo
 
 		// Look for the unordered list that contains antonyms
 		var antonymList *goquery.Selection
-		
+
 		// Look for the next ul
 		antonymList = e.DOM.Parent().Next()
 		if !antonymList.Is("ul") {
@@ -762,7 +762,7 @@ func (w *FrenchWiktionaryAPI) setupAntonymsCallback(c *colly.Collector, word *wo
 			}
 		})
 	})
-	
+
 	// Also try the span.titreanto as a fallback
 	c.OnHTML("span.titreanto", func(e *colly.HTMLElement) {
 		// Only process if we don't already have antonyms
@@ -798,7 +798,7 @@ func (w *FrenchWiktionaryAPI) setupTranslationsCallback(c *colly.Collector, word
 
 		// Translations are in a complex structure, navigate to find them
 		var translationsDiv *goquery.Selection
-		
+
 		// Look for the next div with class boite
 		translationsDiv = e.DOM.Parent().Next()
 		for i := 0; i < 3 && translationsDiv.Length() > 0; i++ {
@@ -807,7 +807,7 @@ func (w *FrenchWiktionaryAPI) setupTranslationsCallback(c *colly.Collector, word
 			}
 			translationsDiv = translationsDiv.Next()
 		}
-		
+
 		if !translationsDiv.HasClass("boite") {
 			return
 		}
@@ -866,7 +866,7 @@ func (w *FrenchWiktionaryAPI) setupTranslationsCallback(c *colly.Collector, word
 			}
 		})
 	})
-	
+
 	// Also try the span.titretrad as a fallback
 	c.OnHTML("span.titretrad", func(e *colly.HTMLElement) {
 		// Only process if we don't already have translations
@@ -996,14 +996,4 @@ func (w *FrenchWiktionaryAPI) setupFallbackDefinitionsCallback(c *colly.Collecto
 			}
 		}
 	})
-}
-
-// Helper function to check if a string is in a slice
-func containsString(slice []string, str string) bool {
-	for _, item := range slice {
-		if item == str {
-			return true
-		}
-	}
-	return false
 }
