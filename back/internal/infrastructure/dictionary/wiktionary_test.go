@@ -8,8 +8,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-
-	"voconsteroid/internal/domain/word"
 )
 
 func TestNewWiktionaryAPI(t *testing.T) {
@@ -164,10 +162,10 @@ func TestFetchWord_ErrorResponse(t *testing.T) {
 func TestExtractDefinitions(t *testing.T) {
 	// Setup
 	html := `<p>Definition 1.</p><p>Definition 2.</p><ul><li>Example 1</li><li>Example 2</li></ul>`
-	
+
 	// Execute
 	definitions := extractDefinitions(html)
-	
+
 	// Assert
 	assert.Len(t, definitions, 2)
 	assert.Equal(t, "Definition 1.", definitions[0])
@@ -177,10 +175,10 @@ func TestExtractDefinitions(t *testing.T) {
 func TestExtractExamples(t *testing.T) {
 	// Setup
 	html := `<p>Definition.</p><ul><li>Example 1</li><li>Example 2</li></ul>`
-	
+
 	// Execute
 	examples := extractExamples(html)
-	
+
 	// Assert
 	assert.Len(t, examples, 2)
 	assert.Equal(t, "Example 1", examples[0])
