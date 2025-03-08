@@ -19,6 +19,10 @@ lint: ## Run golangci-lint
 tidy: ## Run go mod tidy
 	cd back && go mod tidy
 
+.PHONY: test
+test: ## Run tests
+	cd back && go test -v ./...
+
 .PHONY: clean
 clean: ## Clean build artifacts
 	rm -rf $(BIN_DIR)
