@@ -2,11 +2,12 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pashagolub/pgxmock/v2"
+	"github.com/pashagolub/pgxmock/v4"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,8 +83,8 @@ func TestWordRepository_FindByText(t *testing.T) {
 
 	// Setup expected query and response
 	rows := pgxmock.NewRows([]string{
-		"id", "text", "language", "definitions", "examples", "pronunciation", 
-		"etymology", "translations", "word_type", "forms", "search_terms", 
+		"id", "text", "language", "definitions", "examples", "pronunciation",
+		"etymology", "translations", "word_type", "forms", "search_terms",
 		"lemma", "created_at", "updated_at",
 	}).AddRow(
 		testWord.ID,
@@ -142,7 +143,7 @@ func TestWordRepository_FindByText_NotFound(t *testing.T) {
 		FROM words
 		WHERE text = \$1 AND language = \$2`).
 		WithArgs("nonexistent", "en").
-		WillReturnError(pgxmock.ErrNoRows)
+		WillReturnError(errors.New("no rows in result set"))
 
 	// Execute the function being tested
 	result, err := repo.FindByText(ctx, "nonexistent", "en")
@@ -165,8 +166,8 @@ func TestWordRepository_FindByAnyForm(t *testing.T) {
 
 	// Setup expected query and response
 	rows := pgxmock.NewRows([]string{
-		"id", "text", "language", "definitions", "examples", "pronunciation", 
-		"etymology", "translations", "word_type", "forms", "search_terms", 
+		"id", "text", "language", "definitions", "examples", "pronunciation",
+		"etymology", "translations", "word_type", "forms", "search_terms",
 		"lemma", "created_at", "updated_at",
 	}).AddRow(
 		testWord.ID,
@@ -277,8 +278,8 @@ func TestWordRepository_List(t *testing.T) {
 
 	// Setup expected query and response
 	rows := pgxmock.NewRows([]string{
-		"id", "text", "language", "definitions", "examples", "pronunciation", 
-		"etymology", "translations", "word_type", "forms", "search_terms", 
+		"id", "text", "language", "definitions", "examples", "pronunciation",
+		"etymology", "translations", "word_type", "forms", "search_terms",
 		"lemma", "created_at", "updated_at",
 	}).AddRow(
 		testWord.ID,
@@ -331,8 +332,8 @@ func TestWordRepository_List_WithOffset(t *testing.T) {
 
 	// Setup expected query and response
 	rows := pgxmock.NewRows([]string{
-		"id", "text", "language", "definitions", "examples", "pronunciation", 
-		"etymology", "translations", "word_type", "forms", "search_terms", 
+		"id", "text", "language", "definitions", "examples", "pronunciation",
+		"etymology", "translations", "word_type", "forms", "search_terms",
 		"lemma", "created_at", "updated_at",
 	}).AddRow(
 		testWord.ID,
