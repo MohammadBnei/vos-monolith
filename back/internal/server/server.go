@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -128,6 +129,11 @@ func (s *Server) setupRoutes() {
 
 	// Setup Swagger documentation
 	s.setupSwagger()
+	
+	// Serve API documentation index
+	s.router.GET("/api/docs", func(c *gin.Context) {
+		c.File(filepath.Join("api", "index.html"))
+	})
 
 	// Word API routes
 	api := s.router.Group("/api/v1")
