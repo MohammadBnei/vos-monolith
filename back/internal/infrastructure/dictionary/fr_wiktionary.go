@@ -126,7 +126,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 		// Check if this is a table with plural information
 		if e.Name == "table" {
-			if e.HasClass("flextable-fr-mfsp") {
+			if strings.Contains(e.Attr("class"), "flextable-fr-mfsp") {
 				e.ForEach("tr", func(_ int, tr *colly.HTMLElement) {
 					if strings.Contains(tr.Text, "Pluriel") {
 						tr.ForEach("td", func(_ int, td *colly.HTMLElement) {
@@ -139,7 +139,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						})
 					}
 				})
-			} else if e.HasClass("inflection-table") {
+			} else if strings.Contains(e.Attr("class"), "inflection-table") {
 				// Extract plural from declension table
 				e.ForEach("tr", func(_ int, tr *colly.HTMLElement) {
 					if strings.Contains(tr.Text, "plural") {
@@ -154,14 +154,14 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				})
 			}
 		} else if e.Name == "span" {
-			if e.HasClass("ligne-de-forme") {
+			if strings.Contains(e.Attr("class"), "ligne-de-forme") {
 				// Extract word type (masculin/féminin)
 				wordType := strings.TrimSpace(e.Text)
 				if strings.Contains(wordType, "masculin") || strings.Contains(wordType, "féminin") {
 					w.logger.Debug().Str("wordType", wordType).Msg("Found word type")
 					newWord.Gender = wordType
 				}
-			} else if e.HasClass("gender") {
+			} else if strings.Contains(e.Attr("class"), "gender") {
 				// Extract gender information
 				gender := strings.TrimSpace(e.Text)
 				if gender != "" {
