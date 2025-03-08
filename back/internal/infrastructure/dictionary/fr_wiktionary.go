@@ -53,13 +53,16 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	var currentDefinitionIndex int
 	var inFrenchSection bool = false
 
-	// First, identify the French language section
-	c.OnHTML("h2", func(e *colly.HTMLElement) {
+	// First, identify the French language section - try multiple selectors
+	c.OnHTML("h2, div.mw-heading-2", func(e *colly.HTMLElement) {
 		// Check if this is the French language section header
-		if e.ChildText("span.sectionlangue") == "Français" {
+		sectionText := e.ChildText("span.sectionlangue")
+		w.logger.Debug().Str("sectionText", sectionText).Str("element", e.Name).Msg("Found language section")
+		
+		if sectionText == "Français" {
 			inFrenchSection = true
 			w.logger.Debug().Msg("Found French language section")
-		} else if e.ChildText("span.sectionlangue") != "" {
+		} else if sectionText != "" {
 			// If we find another language section after French, stop processing
 			if inFrenchSection {
 				inFrenchSection = false
@@ -85,6 +88,28 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// Debug HTML structure
 	c.OnHTML("html", func(e *colly.HTMLElement) {
 		w.logger.Debug().Msg("Page loaded successfully")
+		
+		// Debug the structure to find French section
+		e.ForEach("h2, div.mw-heading-2", func(_ int, h *colly.HTMLElement) {
+			sectionText := h.ChildText("span.sectionlangue")
+			w.logger.Debug().
+				Str("element", h.Name).
+				Str("id", h.Attr("id")).
+				Str("class", h.Attr("class")).
+				Str("sectionText", sectionText).
+				Msg("Found heading element")
+		})
+		
+		// Debug definition sections
+		e.ForEach("div.mw-heading-3, h3", func(_ int, h *colly.HTMLElement) {
+			titleText := h.ChildText("span.titredef, span.titreetym, span.titresyno")
+			w.logger.Debug().
+				Str("element", h.Name).
+				Str("id", h.Attr("id")).
+				Str("class", h.Attr("class")).
+				Str("titleText", titleText).
+				Msg("Found potential definition section")
+		})
 	})
 
 	// Extract word type (masculine/feminine) and plural form from the flextable
@@ -179,7 +204,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Extract definitions from any ordered list following a definition heading
 	// This handles various HTML structures that might contain definitions
-	c.OnHTML("div.mw-heading-3:has(span.titredef) + p + ol, div.mw-heading-3:has(span.titredef) + ol, h3:has(span.titredef) + ol, h3:has(span.titredef) + p + ol", func(e *colly.HTMLElement) {
+	c.OnHTML("div.mw-heading-3:has(span.titredef) + p + ol, div.mw-heading-3:has(span.titredef) + ol, h3:has(span.titredef) + ol, h3:has(span.titredef) + p + ol, ol", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
@@ -377,10 +402,38 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// Wait until scraping is finished
 	c.Wait()
 
-	// If no definitions were found, return an error
+	// If no definitions were found, try a more aggressive approach
 	if !foundDefinitions || len(newWord.Definitions) == 0 {
-		w.logger.Warn().Str("text", text).Str("language", language).Msg("No word data found")
-		return nil, fmt.Errorf("no word data found: %w", word.ErrWordNotFound)
+		w.logger.Warn().Str("text", text).Str("language", language).Msg("No definitions found with standard selectors, trying fallback")
+		
+		// Fallback: Try to extract any definitions from any ordered list in the French section
+		if inFrenchSection {
+			// Extract all text from ordered lists that might contain definitions
+			c.OnHTML("ol li", func(e *colly.HTMLElement) {
+				if !foundDefinitions {
+					definitionText := strings.TrimSpace(e.Text)
+					if definitionText != "" && len(definitionText) > 10 {
+						w.logger.Debug().Str("definition", definitionText).Msg("Found definition with fallback method")
+						newWord.Definitions = append(newWord.Definitions, definitionText)
+						foundDefinitions = true
+					}
+				}
+			})
+			
+			// Visit the page again with the fallback selectors
+			err := c.Visit(url)
+			if err != nil {
+				w.logger.Error().Err(err).Str("url", url).Msg("Failed to visit page with fallback selectors")
+			}
+			
+			c.Wait()
+		}
+		
+		// If still no definitions, return error
+		if len(newWord.Definitions) == 0 {
+			w.logger.Warn().Str("text", text).Str("language", language).Msg("No word data found after fallback")
+			return nil, fmt.Errorf("no word data found: %w", word.ErrWordNotFound)
+		}
 	}
 	
 	// Remove duplicate definitions and examples
