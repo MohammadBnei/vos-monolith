@@ -34,6 +34,72 @@ func NewFrenchWiktionaryAPI(logger zerolog.Logger) *FrenchWiktionaryAPI {
 	}
 }
 
+// FetchRelatedWords retrieves words related to the given word from French Wiktionary
+func (w *FrenchWiktionaryAPI) FetchRelatedWords(ctx context.Context, word *word.Word) (*word.RelatedWords, error) {
+	w.logger.Debug().Str("word", word.Text).Str("language", word.Language).Msg("Fetching related words from French Wiktionary")
+	
+	// Create a new RelatedWords object with the source word
+	relatedWords := &word.RelatedWords{
+		SourceWord: word,
+		Synonyms:   []*word.Word{},
+		Antonyms:   []*word.Word{},
+	}
+	
+	// If the word already has synonyms or antonyms, fetch them
+	for _, synonym := range word.Synonyms {
+		if synonym == "" {
+			continue
+		}
+		
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			// Fetch the synonym word
+			synonymWord, err := w.FetchWord(ctx, synonym, word.Language)
+			if err == nil && synonymWord != nil {
+				relatedWords.Synonyms = append(relatedWords.Synonyms, synonymWord)
+			} else {
+				// If we can't fetch the full word, create a minimal one
+				minimalWord := word.NewWord(synonym, word.Language)
+				relatedWords.Synonyms = append(relatedWords.Synonyms, minimalWord)
+			}
+		}
+	}
+	
+	// Do the same for antonyms
+	for _, antonym := range word.Antonyms {
+		if antonym == "" {
+			continue
+		}
+		
+		// Check context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			// Fetch the antonym word
+			antonymWord, err := w.FetchWord(ctx, antonym, word.Language)
+			if err == nil && antonymWord != nil {
+				relatedWords.Antonyms = append(relatedWords.Antonyms, antonymWord)
+			} else {
+				// If we can't fetch the full word, create a minimal one
+				minimalWord := word.NewWord(antonym, word.Language)
+				relatedWords.Antonyms = append(relatedWords.Antonyms, minimalWord)
+			}
+		}
+	}
+	
+	w.logger.Debug().
+		Str("word", word.Text).
+		Int("synonyms", len(relatedWords.Synonyms)).
+		Int("antonyms", len(relatedWords.Antonyms)).
+		Msg("Successfully fetched related words")
+	
+	return relatedWords, nil
+}
+
 // FetchWord retrieves word information from French Wiktionary by scraping the web page
 func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*word.Word, error) {
 	w.logger.Debug().Str("text", text).Str("language", language).Msg("Fetching word from French Wiktionary")
