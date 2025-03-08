@@ -16,6 +16,7 @@ type Word struct {
 	Translations  map[string]string `json:"translations,omitempty"`
 	Synonyms      []string          `json:"synonyms,omitempty"`
 	WordType      string            `json:"word_type,omitempty"`
+	Gender        string            `json:"gender,omitempty"`
 	CreatedAt     time.Time         `json:"created_at"`
 	UpdatedAt     time.Time         `json:"updated_at"`
 }

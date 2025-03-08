@@ -87,7 +87,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 			wordType := strings.TrimSpace(e.Text)
 			if strings.Contains(wordType, "masculin") || strings.Contains(wordType, "féminin") {
 				w.logger.Debug().Str("wordType", wordType).Msg("Found word type")
-				newWord.Translations["type"] = wordType
+				newWord.Gender = wordType
 			}
 		}
 	})
