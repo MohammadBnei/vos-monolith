@@ -25,7 +25,8 @@ func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
 }
 
 // getBaseURL returns the appropriate Wiktionary URL based on the language
-func (w *WiktionaryAPI) getBaseURL(language string) string {
+// This is a variable to allow for testing
+func (w *WiktionaryAPI) getBaseURL func(language string) string = func(language string) string {
 	// Map of language codes to Wiktionary subdomains
 	langMap := map[string]string{
 		"en": "en",
