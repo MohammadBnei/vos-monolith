@@ -14,16 +14,39 @@ import (
 
 // WiktionaryAPI implements the word.DictionaryAPI interface for Wiktionary
 type WiktionaryAPI struct {
-	baseURL string
-	logger  zerolog.Logger
+	logger zerolog.Logger
 }
 
 // NewWiktionaryAPI creates a new Wiktionary scraper
 func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
 	return &WiktionaryAPI{
-		baseURL: "https://en.wiktionary.org/wiki",
-		logger:  logger.With().Str("component", "wiktionary_scraper").Logger(),
+		logger: logger.With().Str("component", "wiktionary_scraper").Logger(),
 	}
+}
+
+// getBaseURL returns the appropriate Wiktionary URL based on the language
+func (w *WiktionaryAPI) getBaseURL(language string) string {
+	// Map of language codes to Wiktionary subdomains
+	langMap := map[string]string{
+		"en": "en",
+		"fr": "fr",
+		"es": "es",
+		"de": "de",
+		"it": "it",
+		"pt": "pt",
+		"ru": "ru",
+		"ja": "ja",
+		"zh": "zh",
+		// Add more languages as needed
+	}
+
+	// Get the subdomain for the language, default to English
+	subdomain, ok := langMap[language]
+	if !ok {
+		subdomain = "en"
+	}
+
+	return fmt.Sprintf("https://%s.wiktionary.org/wiki", subdomain)
 }
 
 // FetchWord retrieves word information from Wiktionary by scraping the web page
@@ -47,58 +70,42 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 	
 	// Extract definitions
 	c.OnHTML("ol li", func(e *colly.HTMLElement) {
-		// Check if this is a definition list (usually under the language section)
-		if e.DOM.ParentsFiltered("div[id^='"+language+"']").Length() > 0 || 
-		   e.DOM.ParentsFiltered("h2:contains('"+strings.Title(language)+"')").Length() > 0 {
-			definition := strings.TrimSpace(e.Text)
-			if definition != "" {
-				newWord.Definitions = append(newWord.Definitions, definition)
-				foundDefinitions = true
-			}
+		definition := strings.TrimSpace(e.Text)
+		if definition != "" {
+			newWord.Definitions = append(newWord.Definitions, definition)
+			foundDefinitions = true
 		}
 	})
 
 	// Extract examples
 	c.OnHTML("div.example-needed, ul.citations li, div.citation-whole", func(e *colly.HTMLElement) {
-		if e.DOM.ParentsFiltered("div[id^='"+language+"']").Length() > 0 || 
-		   e.DOM.ParentsFiltered("h2:contains('"+strings.Title(language)+"')").Length() > 0 {
-			example := strings.TrimSpace(e.Text)
-			if example != "" {
-				newWord.Examples = append(newWord.Examples, example)
-			}
+		example := strings.TrimSpace(e.Text)
+		if example != "" {
+			newWord.Examples = append(newWord.Examples, example)
 		}
 	})
 
 	// Extract pronunciation
 	c.OnHTML("span.IPA", func(e *colly.HTMLElement) {
-		if e.DOM.ParentsFiltered("div[id^='"+language+"']").Length() > 0 || 
-		   e.DOM.ParentsFiltered("h2:contains('"+strings.Title(language)+"')").Length() > 0 {
-			if newWord.Pronunciation == "" {
-				newWord.Pronunciation = strings.TrimSpace(e.Text)
-			}
+		if newWord.Pronunciation == "" {
+			newWord.Pronunciation = strings.TrimSpace(e.Text)
 		}
 	})
 
 	// Extract translations
 	c.OnHTML("div.translations li", func(e *colly.HTMLElement) {
-		if e.DOM.ParentsFiltered("div[id^='"+language+"']").Length() > 0 || 
-		   e.DOM.ParentsFiltered("h2:contains('"+strings.Title(language)+"')").Length() > 0 {
-			langCode := e.ChildAttr("span.language", "lang")
-			translation := strings.TrimSpace(e.ChildText("span.translation"))
-			if langCode != "" && translation != "" {
-				newWord.Translations[langCode] = translation
-			}
+		langCode := e.ChildAttr("span.language", "lang")
+		translation := strings.TrimSpace(e.ChildText("span.translation"))
+		if langCode != "" && translation != "" {
+			newWord.Translations[langCode] = translation
 		}
 	})
 
 	// Extract etymology if available
 	c.OnHTML("div#Etymology, div[id^='Etymology_']", func(e *colly.HTMLElement) {
-		if e.DOM.ParentsFiltered("div[id^='"+language+"']").Length() > 0 || 
-		   e.DOM.ParentsFiltered("h2:contains('"+strings.Title(language)+"')").Length() > 0 {
-			etymology := strings.TrimSpace(e.Text)
-			if etymology != "" {
-				newWord.Etymology = etymology
-			}
+		etymology := strings.TrimSpace(e.Text)
+		if etymology != "" {
+			newWord.Etymology = etymology
 		}
 	})
 
@@ -108,7 +115,8 @@ func (w *WiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*
 	})
 
 	// Build URL for the web page
-	url := fmt.Sprintf("%s/%s", w.baseURL, text)
+	baseURL := w.getBaseURL(language)
+	url := fmt.Sprintf("%s/%s", baseURL, text)
 	
 	// Check if context is done
 	select {
