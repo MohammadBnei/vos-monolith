@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -55,6 +56,11 @@ func NewServer(cfg *config.Config, log zerolog.Logger, wordService word.Service)
 func (s *Server) Run() error {
 	s.setupMiddleware()
 	s.setupRoutes()
+
+	// Check if port is already in use before starting the server
+	if err := s.checkPortAvailable(s.cfg.HTTPPort); err != nil {
+		return fmt.Errorf("port check failed: %w", err)
+	}
 
 	s.srv = &http.Server{
 		Addr:         fmt.Sprintf(":%s", s.cfg.HTTPPort),
@@ -144,6 +150,16 @@ func (s *Server) setupRoutes() {
 			words.GET("/recent", s.GetRecentWords)
 		}
 	}
+}
+
+// checkPortAvailable checks if the specified port is available for binding
+func (s *Server) checkPortAvailable(port string) error {
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	if err != nil {
+		return fmt.Errorf("port %s is not available: %w", port, err)
+	}
+	ln.Close()
+	return nil
 }
 
 // loggerMiddleware creates a middleware that logs HTTP requests.
