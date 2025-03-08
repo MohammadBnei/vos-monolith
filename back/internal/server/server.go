@@ -25,10 +25,6 @@ type Server struct {
 
 	// Services
 	wordService word.Service
-
-	// Channels for managing server lifecycle
-	serverErrors chan error
-	shutdown     chan struct{}
 }
 
 // NewServer creates a new server instance with the provided configuration and logger.
@@ -43,12 +39,10 @@ func NewServer(cfg *config.Config, log zerolog.Logger, wordService word.Service)
 	router := gin.New()
 
 	return &Server{
-		cfg:          cfg,
-		log:          log,
-		router:       router,
-		wordService:  wordService,
-		serverErrors: make(chan error, 1),
-		shutdown:     make(chan struct{}, 1),
+		cfg:         cfg,
+		log:         log,
+		router:      router,
+		wordService: wordService,
 	}
 }
 
@@ -70,47 +64,35 @@ func (s *Server) Run() error {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	// Start the server in a goroutine
-	go func() {
-		s.log.Info().
-			Str("port", s.cfg.HTTPPort).
-			Str("app", s.cfg.AppName).
-			Msg("Starting server")
+	// Log server start
+	s.log.Info().
+		Str("port", s.cfg.HTTPPort).
+		Str("app", s.cfg.AppName).
+		Msg("Starting server")
 
-		if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			s.serverErrors <- fmt.Errorf("server error: %w", err)
-		}
-	}()
+	// Start the server in the main goroutine so errors are returned immediately
+	err := s.srv.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("server error: %w", err)
+	}
 
 	return nil
 }
 
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown() error {
-	// Notify shutdown
-	go func() {
-		s.shutdown <- struct{}{}
-	}()
+	s.log.Info().Msg("Starting graceful shutdown")
 
-	// Blocking main and waiting for shutdown
-	select {
-	case err := <-s.serverErrors:
-		return fmt.Errorf("server error during shutdown: %w", err)
+	// Give outstanding requests a deadline for completion
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	case <-s.shutdown:
-		s.log.Info().Msg("Starting graceful shutdown")
-
-		// Give outstanding requests a deadline for completion
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := s.srv.Shutdown(ctx); err != nil {
-			return fmt.Errorf("graceful shutdown failed: %w", err)
-		}
-
-		s.log.Info().Msg("Server stopped")
-		return nil
+	if err := s.srv.Shutdown(ctx); err != nil {
+		return fmt.Errorf("graceful shutdown failed: %w", err)
 	}
+
+	s.log.Info().Msg("Server stopped")
+	return nil
 }
 
 // setupMiddleware configures all middleware for the server.
