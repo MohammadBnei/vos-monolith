@@ -58,7 +58,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		// Check if this is the French language section header
 		sectionText := e.ChildText("span.sectionlangue")
 		w.logger.Debug().Str("sectionText", sectionText).Str("element", e.Name).Msg("Found language section")
-		
+
 		if sectionText == "Français" {
 			inFrenchSection = true
 			w.logger.Debug().Msg("Found French language section")
@@ -77,7 +77,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if !inFrenchSection {
 			return
 		}
-		
+
 		etymology := strings.TrimSpace(e.Text)
 		if etymology != "" {
 			w.logger.Debug().Str("etymology", etymology).Msg("Found etymology")
@@ -88,7 +88,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// Debug HTML structure
 	c.OnHTML("html", func(e *colly.HTMLElement) {
 		w.logger.Debug().Msg("Page loaded successfully")
-		
+
 		// Debug the structure to find French section
 		e.ForEach("h2, div.mw-heading-2", func(_ int, h *colly.HTMLElement) {
 			sectionText := h.ChildText("span.sectionlangue")
@@ -99,7 +99,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				Str("sectionText", sectionText).
 				Msg("Found heading element")
 		})
-		
+
 		// Debug definition sections
 		e.ForEach("div.mw-heading-3, h3", func(_ int, h *colly.HTMLElement) {
 			titleText := h.ChildText("span.titredef, span.titreetym, span.titresyno")
@@ -118,7 +118,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if !inFrenchSection {
 			return
 		}
-		
+
 		// Check if this is a table with plural information
 		if e.Name == "table" {
 			e.ForEach("tr", func(_ int, tr *colly.HTMLElement) {
@@ -149,7 +149,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if !inFrenchSection {
 			return
 		}
-		
+
 		if newWord.Pronunciation == "" {
 			pronunciation := strings.TrimSpace(e.Text)
 			if strings.HasPrefix(pronunciation, "\\") && strings.HasSuffix(pronunciation, "\\") {
@@ -166,7 +166,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if !inFrenchSection {
 			return
 		}
-		
+
 		titleDef := e.ChildText("span.titredef")
 		if titleDef != "" {
 			w.logger.Debug().Str("section", titleDef).Msg("Found definition section")
@@ -191,7 +191,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if !inFrenchSection {
 			return
 		}
-		
+
 		defType := strings.TrimSpace(e.Text)
 		// Clean up the definition type
 		defType = strings.TrimPrefix(defType, "(")
@@ -209,10 +209,10 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if !inFrenchSection {
 			return
 		}
-		
+
 		w.logger.Debug().Msg("Found definition list")
 		inDefinitionList = true
-		
+
 		// Process each list item as a definition
 		e.ForEach("li", func(i int, li *colly.HTMLElement) {
 			// Check for definition type within this list item
@@ -224,34 +224,34 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				currentDefinitionType = defType
 				w.logger.Debug().Str("definitionType", defType).Msg("Found inline definition type")
 			}
-			
+
 			// Get the main definition text without examples
 			var definitionText string
-			
+
 			// First, try to get just the direct text content without child elements
 			definitionText = li.DOM.Contents().Not("ul").Not("span.example").Text()
 			definitionText = strings.TrimSpace(definitionText)
-			
+
 			// If that fails, fall back to getting all text and cleaning it later
 			if definitionText == "" {
 				definitionText = strings.TrimSpace(li.Text)
 			}
-			
+
 			// Skip empty definitions
 			if definitionText == "" {
 				return
 			}
-			
+
 			// Add definition type prefix if available
 			if currentDefinitionType != "" {
 				definitionText = "(" + currentDefinitionType + ") " + definitionText
 			}
-			
+
 			// Add the definition
 			newWord.Definitions = append(newWord.Definitions, definitionText)
 			currentDefinitionIndex = len(newWord.Definitions) - 1
 			w.logger.Debug().Int("index", currentDefinitionIndex).Str("definition", definitionText).Msg("Found definition")
-			
+
 			// Extract examples separately
 			li.ForEach("span.example", func(_ int, example *colly.HTMLElement) {
 				exampleText := strings.TrimSpace(example.Text)
@@ -263,23 +263,23 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					newWord.Examples = append(newWord.Examples, exampleText)
 				}
 			})
-			
+
 			foundDefinitions = true
 		})
 	})
-	
+
 	// Backup method to extract definitions if the above selector doesn't work
 	c.OnHTML("ol", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
 		}
-		
+
 		// Only process if we haven't found definitions yet and we're in a definition section
 		if !foundDefinitions && currentSection == "definitions" && !inDefinitionList {
 			w.logger.Debug().Msg("Using backup method to find definitions")
 			inDefinitionList = true
-			
+
 			e.ForEach("li", func(i int, li *colly.HTMLElement) {
 				// Check for definition type within this list item
 				defType := li.ChildText("span.emploi")
@@ -290,34 +290,34 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					currentDefinitionType = defType
 					w.logger.Debug().Str("definitionType", defType).Msg("Found backup definition type")
 				}
-				
+
 				// Get the main definition text without examples
 				var definitionText string
-				
+
 				// First, try to get just the direct text content without child elements
 				definitionText = li.DOM.Contents().Not("ul").Not("span.example").Text()
 				definitionText = strings.TrimSpace(definitionText)
-				
+
 				// If that fails, fall back to getting all text and cleaning it later
 				if definitionText == "" {
 					definitionText = strings.TrimSpace(li.Text)
 				}
-				
+
 				// Skip empty definitions
 				if definitionText == "" {
 					return
 				}
-				
+
 				// Add definition type prefix if available
 				if currentDefinitionType != "" {
 					definitionText = "(" + currentDefinitionType + ") " + definitionText
 				}
-				
+
 				// Add the definition
 				newWord.Definitions = append(newWord.Definitions, definitionText)
 				currentDefinitionIndex = len(newWord.Definitions) - 1
 				w.logger.Debug().Int("index", currentDefinitionIndex).Str("definition", definitionText).Msg("Found definition")
-				
+
 				// Extract examples separately
 				li.ForEach("span.example", func(_ int, example *colly.HTMLElement) {
 					exampleText := strings.TrimSpace(example.Text)
@@ -329,39 +329,39 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						newWord.Examples = append(newWord.Examples, exampleText)
 					}
 				})
-				
+
 				foundDefinitions = true
 			})
 		}
 	})
-	
+
 	// Additional backup method to find definitions in paragraphs
 	c.OnHTML("div.mw-heading-3:has(span.titredef) ~ p, h3:has(span.titredef) ~ p", func(e *colly.HTMLElement) {
 		// Only process if we're in the French section
 		if !inFrenchSection {
 			return
 		}
-		
+
 		// Only process if we haven't found definitions yet
 		if !foundDefinitions {
 			definitionText := strings.TrimSpace(e.Text)
-			
+
 			// Skip empty definitions or paragraphs that are likely not definitions
 			if definitionText == "" || len(definitionText) < 5 {
 				return
 			}
-			
+
 			w.logger.Debug().Msg("Found definition in paragraph")
-			
+
 			// Add definition type prefix if available
 			if currentDefinitionType != "" {
 				definitionText = "(" + currentDefinitionType + ") " + definitionText
 			}
-			
+
 			// Add the definition
 			newWord.Definitions = append(newWord.Definitions, definitionText)
 			w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition in paragraph")
-			
+
 			foundDefinitions = true
 		}
 	})
@@ -372,7 +372,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		if !inFrenchSection {
 			return
 		}
-		
+
 		e.ForEach("li", func(_ int, li *colly.HTMLElement) {
 			synonym := strings.TrimSpace(li.Text)
 			if synonym != "" {
@@ -405,7 +405,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// If no definitions were found, try a more aggressive approach
 	if !foundDefinitions || len(newWord.Definitions) == 0 {
 		w.logger.Warn().Str("text", text).Str("language", language).Msg("No definitions found with standard selectors, trying fallback")
-		
+
 		// Fallback: Try to extract any definitions from any ordered list in the French section
 		if inFrenchSection {
 			// Extract all text from ordered lists that might contain definitions
@@ -419,23 +419,23 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					}
 				}
 			})
-			
+
 			// Visit the page again with the fallback selectors
 			err := c.Visit(url)
 			if err != nil {
 				w.logger.Error().Err(err).Str("url", url).Msg("Failed to visit page with fallback selectors")
 			}
-			
+
 			c.Wait()
 		}
-		
+
 		// If still no definitions, return error
 		if len(newWord.Definitions) == 0 {
 			w.logger.Warn().Str("text", text).Str("language", language).Msg("No word data found after fallback")
 			return nil, fmt.Errorf("no word data found: %w", word.ErrWordNotFound)
 		}
 	}
-	
+
 	// Remove duplicate definitions and examples
 	newWord.Definitions = removeDuplicates(newWord.Definitions)
 	newWord.Examples = removeDuplicates(newWord.Examples)
@@ -457,7 +457,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 func removeDuplicates(strSlice []string) []string {
 	keys := make(map[string]bool)
 	list := []string{}
-	
+
 	for _, entry := range strSlice {
 		if _, value := keys[entry]; !value {
 			keys[entry] = true
