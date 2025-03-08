@@ -658,6 +658,12 @@ func (w *FrenchWiktionaryAPI) setupDefinitionsCallback(c *colly.Collector, word 
 						// Clean up the example text
 						exampleText = strings.ReplaceAll(exampleText, "« ", "")
 						exampleText = strings.ReplaceAll(exampleText, " »", "")
+						
+						// Skip examples with "Exemple d'utilisation manquant"
+						if strings.Contains(exampleText, "Exemple d'utilisation manquant") {
+							w.logger.Debug().Str("example", exampleText).Msg("Skipping 'missing example' message")
+							return
+						}
 
 						// Only add if we haven't seen this example before
 						if !seenExamples[exampleText] {
