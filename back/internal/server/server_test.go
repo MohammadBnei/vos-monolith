@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -39,7 +40,7 @@ func TestNewServer(t *testing.T) {
 		HTTPPort: "8080",
 	}
 
-	logger := zerolog.New(zerolog.NewTestWriter())
+	logger := zerolog.New(zerolog.NewTestWriter(t))
 
 	server := NewServer(cfg, logger)
 
@@ -61,8 +62,8 @@ func TestHealthCheck(t *testing.T) {
 	}
 
 	// Create a test writer to capture log output
-	testWriter := zerolog.NewTestWriter()
-	logger := zerolog.New(testWriter)
+	buf := &bytes.Buffer{}
+	logger := zerolog.New(buf)
 
 	// Create server
 	server := NewServer(cfg, logger)
@@ -91,7 +92,7 @@ func TestHealthCheck(t *testing.T) {
 	assert.Equal(t, "Test App", response["app"])
 
 	// Verify log output contains our message
-	assert.Contains(t, testWriter.String(), "Health check request")
+	assert.Contains(t, buf.String(), "Health check request")
 }
 
 func TestLoggerMiddleware(t *testing.T) {
@@ -104,8 +105,8 @@ func TestLoggerMiddleware(t *testing.T) {
 	}
 
 	// Create a test writer to capture log output
-	testWriter := zerolog.NewTestWriter()
-	logger := zerolog.New(testWriter)
+	buf := &bytes.Buffer{}
+	logger := zerolog.New(buf)
 
 	// Create server
 	server := NewServer(cfg, logger)
@@ -129,7 +130,7 @@ func TestLoggerMiddleware(t *testing.T) {
 	assert.Equal(t, logger, contextLogger)
 
 	// Verify log output contains our messages
-	logOutput := testWriter.String()
+	logOutput := buf.String()
 	assert.Contains(t, logOutput, "Request started")
 	assert.Contains(t, logOutput, "Request completed")
 	assert.Contains(t, logOutput, "GET")

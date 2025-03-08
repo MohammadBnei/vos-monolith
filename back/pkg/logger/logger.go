@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/pkgerrors"
 )
 
 // New returns a new zerolog.Logger instance with the given log level.
@@ -13,6 +14,10 @@ func New(level string) zerolog.Logger {
 	logLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
 		logLevel = zerolog.InfoLevel
+	}
+
+	if logLevel == zerolog.ErrorLevel || logLevel == zerolog.DebugLevel {
+		zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	}
 
 	output := zerolog.ConsoleWriter{Out: os.Stdout}
