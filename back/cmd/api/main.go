@@ -2,14 +2,12 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	"voconsteroid/internal/config"
@@ -48,9 +46,9 @@ func run() error {
 	log.Info().Str("app", cfg.AppName).Msg("Starting application")
 
 	// Initialize database connection
-	dbpool, err := pgxpool.Connect(context.Background(), cfg.DatabaseURL)
+	dbpool, err := config.InitDatabase(cfg, log)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 	defer dbpool.Close()
 
