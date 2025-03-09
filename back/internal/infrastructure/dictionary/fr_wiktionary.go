@@ -403,16 +403,16 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 										return
 									}
 
-									if j > 0 && foundDefinition.LangageSpecifics["plural"] == "" {
-										foundDefinition.LangageSpecifics["plural"] = child.Children().First().Text()
+									if j > 0 && foundDefinition.LanguageSpecifics["plural"] == "" {
+										foundDefinition.LanguageSpecifics["plural"] = child.Children().First().Text()
 									}
 
 									// masculin or feminin
 									switch text {
 									case "Féminin":
-										foundDefinition.LangageSpecifics["féminin"] = child.Next().Children().First().Text()
+										foundDefinition.LanguageSpecifics["féminin"] = child.Next().Children().First().Text()
 									case "Masculin":
-										foundDefinition.LangageSpecifics["masculin"] = child.Next().Children().First().Text()
+										foundDefinition.LanguageSpecifics["masculin"] = child.Next().Children().First().Text()
 									}
 								})
 							}
