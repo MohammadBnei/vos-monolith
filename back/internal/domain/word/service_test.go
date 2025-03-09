@@ -101,10 +101,8 @@ func TestSearch_ExistingWord(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	// Expect repository to find the word
+	// Expect repository to find the word by text first
 	repo.On("FindByText", ctx, "test", "en").Return(expectedWord, nil)
-
-	repo.On("FindByAnyForm", ctx, "test", "en").Return(expectedWord, nil)
 
 	// Execute
 	word, err := svc.Search(ctx, "test", "en")
@@ -114,6 +112,9 @@ func TestSearch_ExistingWord(t *testing.T) {
 	assert.Equal(t, expectedWord, word)
 	repo.AssertExpectations(t)
 	dictAPI.AssertNotCalled(t, "FetchWord")
+	
+	// Verify that FindByAnyForm was not called since we found the word by text
+	repo.AssertNotCalled(t, "FindByAnyForm")
 }
 
 func TestSearch_NewWord(t *testing.T) {
