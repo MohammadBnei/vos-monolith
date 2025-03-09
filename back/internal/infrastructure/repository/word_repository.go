@@ -136,7 +136,7 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 	query := `
 		INSERT INTO words (
 			text, language, definitions, examples, pronunciation, etymology, translations, 
-			word_type, forms, search_terms, lemma, created_at, updated_at
+			word_type, search_terms, lemma, created_at, updated_at
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (text, language) 
@@ -147,10 +147,9 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 			etymology = $6,
 			translations = $7,
 			word_type = $8,
-			forms = $9,
-			search_terms = $10,
-			lemma = $11,
-			updated_at = $13
+			search_terms = $9,
+			lemma = $10,
+			updated_at = $12
 		RETURNING id
 	`
 
@@ -223,7 +222,7 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 	var words []*word.Word
 	for rows.Next() {
 		var w word.Word
-		var definitionsJSON, wordFormsJSON []byte
+		var definitionsJSON []byte
 		var examples, searchTerms []string
 		var translations map[string]string
 
@@ -237,7 +236,6 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 			&w.Etymology,
 			&translations,
 			&w.WordType,
-			&wordFormsJSON,
 			&searchTerms,
 			&w.Lemma,
 			&w.CreatedAt,
