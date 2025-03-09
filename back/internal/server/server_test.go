@@ -65,6 +65,14 @@ func (m *MockWordService) GetRecentWords(ctx context.Context, language string, l
 	return args.Get(0).([]*word.Word), args.Error(1)
 }
 
+func (m *MockWordService) AutoComplete(ctx context.Context, prefix, language string) ([]*word.Word, error) {
+	args := m.Called(ctx, prefix, language)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*word.Word), args.Error(1)
+}
+
 func TestNewServer(t *testing.T) {
 	cfg := &config.Config{
 		AppName:  "Test App",
@@ -305,4 +313,105 @@ func TestGetRecentWords(t *testing.T) {
 
 	// Verify mock was called
 	wordService.AssertExpectations(t)
+}
+
+func TestAutoComplete(t *testing.T) {
+	// Setup
+	gin.SetMode(gin.TestMode)
+
+	cfg := &config.Config{
+		AppName:  "Test App",
+		HTTPPort: "8080",
+	}
+
+	logger := zerolog.New(zerolog.NewTestWriter(t))
+	wordService := new(MockWordService)
+
+	// Create server
+	server := NewServer(cfg, logger, wordService)
+
+	// Mock word service response
+	testWords := []*word.Word{
+		{
+			Text:     "test1",
+			Language: "en",
+		},
+		{
+			Text:     "test2",
+			Language: "en",
+		},
+	}
+	wordService.On("AutoComplete", mock.Anything, "test", "en").Return(testWords, nil)
+
+	// Create test request
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/words/autocomplete?q=test&lang=en", nil)
+
+	// Create router and register handler
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("logger", logger)
+		c.Next()
+	})
+	router.GET("/api/v1/words/autocomplete", server.AutoComplete)
+
+	// Execute request
+	router.ServeHTTP(w, req)
+
+	// Assert response
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response AutoCompleteResponse
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response.Suggestions)
+	assert.Len(t, response.Suggestions, 2)
+	assert.Equal(t, "test1", response.Suggestions[0].Text)
+	assert.Equal(t, "test2", response.Suggestions[1].Text)
+
+	// Verify mock was called
+	wordService.AssertExpectations(t)
+}
+
+func TestAutoComplete_InvalidRequest(t *testing.T) {
+	// Setup
+	gin.SetMode(gin.TestMode)
+
+	cfg := &config.Config{
+		AppName:  "Test App",
+		HTTPPort: "8080",
+	}
+
+	logger := zerolog.New(zerolog.NewTestWriter(t))
+	wordService := new(MockWordService)
+
+	// Create server
+	server := NewServer(cfg, logger, wordService)
+
+	// Create test request with missing query parameter
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/v1/words/autocomplete", nil)
+
+	// Create router and register handler
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("logger", logger)
+		c.Next()
+	})
+	router.GET("/api/v1/words/autocomplete", server.AutoComplete)
+
+	// Execute request
+	router.ServeHTTP(w, req)
+
+	// Assert response
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(http.StatusBadRequest), response["status"])
+	assert.Contains(t, response["message"], "Invalid request")
+
+	// Verify mock was not called
+	wordService.AssertNotCalled(t, "AutoComplete")
 }

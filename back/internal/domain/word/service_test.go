@@ -66,6 +66,14 @@ func (m *MockDictionaryAPI) FetchRelatedWords(ctx context.Context, word *Word) (
 	return args.Get(0).(*RelatedWords), args.Error(1)
 }
 
+func (m *MockDictionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]*Word, error) {
+	args := m.Called(ctx, prefix, language)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*Word), args.Error(1)
+}
+
 func TestNewService(t *testing.T) {
 	// Setup
 	repo := new(MockRepository)
@@ -263,4 +271,128 @@ func TestGetRecentWords_RepositoryError(t *testing.T) {
 	assert.Nil(t, words)
 	assert.Equal(t, repoErr, err)
 	repo.AssertExpectations(t)
+}
+
+func TestAutoComplete(t *testing.T) {
+	// Setup
+	repo, dictAPI, svc := setupTestService(t)
+
+	ctx := context.Background()
+	
+	// Create test data
+	localWords := []*Word{
+		{Text: "test1", Language: "en"},
+		{Text: "test2", Language: "en"},
+	}
+	
+	apiWords := []*Word{
+		{Text: "test2", Language: "en"}, // Duplicate that should be deduplicated
+		{Text: "test3", Language: "en"},
+	}
+	
+	expectedWords := []*Word{
+		{Text: "test1", Language: "en"},
+		{Text: "test2", Language: "en"},
+		{Text: "test3", Language: "en"},
+	}
+
+	// Expect repository to find words by prefix
+	repo.On("FindByPrefix", ctx, "test", "en", 5).Return(localWords, nil)
+	
+	// Expect dictionary API to fetch suggestions
+	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(apiWords, nil)
+
+	// Execute
+	results, err := svc.AutoComplete(ctx, "test", "en")
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Len(t, results, 3)
+	
+	// Check that results are sorted alphabetically
+	assert.Equal(t, "test1", results[0].Text)
+	assert.Equal(t, "test2", results[1].Text)
+	assert.Equal(t, "test3", results[2].Text)
+	
+	repo.AssertExpectations(t)
+	dictAPI.AssertExpectations(t)
+}
+
+func TestAutoComplete_ShortPrefix(t *testing.T) {
+	// Setup
+	repo, dictAPI, svc := setupTestService(t)
+
+	ctx := context.Background()
+
+	// Execute with prefix that's too short
+	results, err := svc.AutoComplete(ctx, "t", "en")
+
+	// Assert
+	assert.Error(t, err)
+	assert.Equal(t, ErrInvalidWord, err)
+	assert.Nil(t, results)
+	
+	// Verify no calls were made
+	repo.AssertNotCalled(t, "FindByPrefix")
+	dictAPI.AssertNotCalled(t, "FetchSuggestions")
+}
+
+func TestAutoComplete_RepositoryError(t *testing.T) {
+	// Setup
+	repo, dictAPI, svc := setupTestService(t)
+
+	ctx := context.Background()
+	repoErr := errors.New("repository error")
+	
+	// Create test data for API
+	apiWords := []*Word{
+		{Text: "test3", Language: "en"},
+	}
+
+	// Expect repository to return an error
+	repo.On("FindByPrefix", ctx, "test", "en", 5).Return(nil, repoErr)
+	
+	// API should still be called and succeed
+	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(apiWords, nil)
+
+	// Execute
+	results, err := svc.AutoComplete(ctx, "test", "en")
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "test3", results[0].Text)
+	
+	repo.AssertExpectations(t)
+	dictAPI.AssertExpectations(t)
+}
+
+func TestAutoComplete_APIError(t *testing.T) {
+	// Setup
+	repo, dictAPI, svc := setupTestService(t)
+
+	ctx := context.Background()
+	apiErr := errors.New("API error")
+	
+	// Create test data for repository
+	localWords := []*Word{
+		{Text: "test1", Language: "en"},
+	}
+
+	// Repository should succeed
+	repo.On("FindByPrefix", ctx, "test", "en", 5).Return(localWords, nil)
+	
+	// API should fail
+	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(nil, apiErr)
+
+	// Execute
+	results, err := svc.AutoComplete(ctx, "test", "en")
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "test1", results[0].Text)
+	
+	repo.AssertExpectations(t)
+	dictAPI.AssertExpectations(t)
 }

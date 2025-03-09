@@ -186,6 +186,135 @@ func TestFrenchWiktionaryAPI_FetchRelatedWords_ContextCancellation(t *testing.T)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "context canceled")
 }
+
+func TestFrenchWiktionaryAPI_FetchSuggestions(t *testing.T) {
+	// Skip this test in CI environments or when running automated tests
+	if testing.Short() {
+		t.Skip("Skipping test that makes external API calls")
+	}
+
+	// Create a test API
+	api := createTestAPI(t)
+
+	// Test with a real French prefix
+	ctx := context.Background()
+	suggestions, err := api.FetchSuggestions(ctx, "mai", "fr")
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotEmpty(t, suggestions)
+	
+	// Check that we got string suggestions
+	for _, suggestion := range suggestions {
+		assert.NotEmpty(t, suggestion)
+	}
+}
+
+func TestFrenchWiktionaryAPI_FetchSuggestions_UnsupportedLanguage(t *testing.T) {
+	// Create a test API
+	api := createTestAPI(t)
+
+	// Test with an unsupported language
+	ctx := context.Background()
+	suggestions, err := api.FetchSuggestions(ctx, "test", "en")
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, suggestions)
+	assert.Contains(t, err.Error(), "unsupported language en")
+}
+
+func TestFrenchWiktionaryAPI_FetchSuggestions_MockServer(t *testing.T) {
+	// Create a test server that returns a mock JSON response
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"pages": [
+				{"id": 1, "key": "test1", "title": "test1", "excerpt": "test1"},
+				{"id": 2, "key": "test2", "title": "test2", "excerpt": "test2"}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	// Create a logger
+	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+
+	// Create a French Wiktionary API with a custom HTTP client
+	api := &FrenchWiktionaryAPI{
+		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
+		getBaseURL: func(language string) string {
+			return server.URL
+		},
+	}
+
+	// Test the FetchSuggestions method
+	ctx := context.Background()
+	suggestions, err := api.FetchSuggestions(ctx, "test", "fr")
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Len(t, suggestions, 2)
+	assert.Equal(t, "test1", suggestions[0])
+	assert.Equal(t, "test2", suggestions[1])
+}
+
+func TestFrenchWiktionaryAPI_FetchSuggestions_InvalidJSON(t *testing.T) {
+	// Create a test server that returns invalid JSON
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{invalid json`))
+	}))
+	defer server.Close()
+
+	// Create a logger
+	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+
+	// Create a French Wiktionary API with a custom HTTP client
+	api := &FrenchWiktionaryAPI{
+		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
+		getBaseURL: func(language string) string {
+			return server.URL
+		},
+	}
+
+	// Test the FetchSuggestions method
+	ctx := context.Background()
+	suggestions, err := api.FetchSuggestions(ctx, "test", "fr")
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, suggestions)
+	assert.Contains(t, err.Error(), "failed to decode response")
+}
+
+func TestFrenchWiktionaryAPI_FetchSuggestions_ServerError(t *testing.T) {
+	// Create a test server that returns a server error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	// Create a logger
+	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+
+	// Create a French Wiktionary API with a custom HTTP client
+	api := &FrenchWiktionaryAPI{
+		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
+		getBaseURL: func(language string) string {
+			return server.URL
+		},
+	}
+
+	// Test the FetchSuggestions method
+	ctx := context.Background()
+	suggestions, err := api.FetchSuggestions(ctx, "test", "fr")
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, suggestions)
+	assert.Contains(t, err.Error(), "received non-OK status code")
+}
 func TestFrenchWiktionaryAPI_RealFetchWord(t *testing.T) {
 	// Create a test API with real Wiktionary URL
 	api := createTestAPI(t)
