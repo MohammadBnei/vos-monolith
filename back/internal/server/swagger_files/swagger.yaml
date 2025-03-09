@@ -65,11 +65,12 @@ paths:
       parameters:
         - name: language
           in: query
-          description: Language code (e.g., en, fr, es)
+          description: Language code
           required: false
           schema:
             type: string
-            default: en
+            enum: [fr]
+            default: fr
         - name: limit
           in: query
           description: Maximum number of words to return
@@ -296,7 +297,9 @@ components:
           description: The word to search for
         language:
           type: string
-          description: Language code (e.g., en, fr, es)
+          description: Language code
+          enum: [fr]
+          default: fr
       required:
         - text
         - language
