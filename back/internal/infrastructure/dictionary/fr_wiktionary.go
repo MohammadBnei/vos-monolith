@@ -309,21 +309,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		}
 	})
 
-	// Extract pronunciation
-	c.OnHTML("span.API", func(e *colly.HTMLElement) {
-		// Only set if we haven't already found it in a section
-		if newWord.Pronunciation == nil || newWord.Pronunciation["ipa"] == "" {
-			pronunciation := strings.TrimSpace(e.Text)
-			if strings.HasPrefix(pronunciation, "\\") && strings.HasSuffix(pronunciation, "\\") {
-				w.logger.Debug().Str("pronunciation", pronunciation).Msg("Found pronunciation")
-				if newWord.Pronunciation == nil {
-					newWord.Pronunciation = make(map[string]string)
-				}
-				newWord.Pronunciation["ipa"] = pronunciation
-			}
-		}
-	})
-
 	c.OnScraped(func(r *colly.Response) {
 		// Extract etymology if section exists
 		if etymologyID, ok := pageStructure.OtherSections["etymology"]; ok {
@@ -747,11 +732,9 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		Str("text", text).
 		Str("language", language).
 		Int("definitions", len(newWord.Definitions)).
-		Int("examples", len(newWord.Examples)).
 		Int("synonyms", len(newWord.Synonyms)).
 		Int("antonyms", len(newWord.Antonyms)).
 		Str("etymology", newWord.Etymology).
-		Interface("pronunciation", newWord.Pronunciation).
 		Msg("Successfully fetched word data from French Wiktionary")
 
 	return newWord, nil

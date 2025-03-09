@@ -39,7 +39,7 @@ func TestWordRepository_ErrorHandling(t *testing.T) {
 	ctx := context.Background()
 
 	// Test database error handling
-	mock.ExpectQuery(`SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
+	mock.ExpectQuery(`SELECT id, text, language, definitions, etymology, translations, 
 		       word_type, search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE text = \$1 AND language = \$2`).
@@ -54,7 +54,7 @@ func TestWordRepository_ErrorHandling(t *testing.T) {
 	assert.ErrorIs(t, err, word.ErrWordNotFound)
 
 	// Test with a different error
-	mock.ExpectQuery(`SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
+	mock.ExpectQuery(`SELECT id, text, language, definitions, etymology, translations, 
 		       word_type, search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE text = \$1 AND language = \$2`).

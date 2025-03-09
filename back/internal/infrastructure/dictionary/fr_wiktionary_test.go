@@ -45,17 +45,8 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 		}
 	}
 
-	// Check that we have examples
-	assert.Greater(t, len(word.Examples), 0, "Should have at least one example")
-
 	// Check that we have synonyms
 	assert.Greater(t, len(word.Synonyms), 0, "Should have at least one synonym")
-
-	// Check that we have a pronunciation
-	assert.NotEmpty(t, word.Pronunciation, "Should have pronunciation")
-	if word.Pronunciation != nil {
-		assert.NotEmpty(t, word.Pronunciation["ipa"], "Should have IPA pronunciation")
-	}
 
 	// Check that we have an etymology
 	assert.NotEmpty(t, word.Etymology, "Should have etymology")
@@ -162,17 +153,8 @@ func TestFrenchWiktionaryAPI_RealFetchWord(t *testing.T) {
 	// Check that we have definitions
 	assert.Greater(t, len(word.Definitions), 0, "Should have at least one definition")
 
-	// Check that we have examples
-	assert.Greater(t, len(word.Examples), 0, "Should have at least one example")
-
 	// Check that we have synonyms
 	assert.Greater(t, len(word.Synonyms), 0, "Should have at least one synonym")
-
-	// Check that we have a pronunciation
-	assert.NotEmpty(t, word.Pronunciation, "Should have pronunciation")
-	if word.Pronunciation != nil {
-		assert.NotEmpty(t, word.Pronunciation["ipa"], "Should have IPA pronunciation")
-	}
 
 	// Check that we have an etymology
 	assert.NotEmpty(t, word.Etymology, "Should have etymology")
