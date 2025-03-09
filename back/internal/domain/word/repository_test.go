@@ -19,7 +19,12 @@ func (s *RepositoryTestSuite) TestFindByText(t *testing.T) {
 	testWord := &Word{
 		Text:     "test",
 		Language: "en",
-		Definitions: []string{"a procedure intended to establish the quality, performance, or reliability of something"},
+		Definitions: []Definition{
+			{
+				Text:     "a procedure intended to establish the quality, performance, or reliability of something",
+				WordType: "noun",
+			},
+		},
 	}
 
 	// Save the word first
@@ -34,7 +39,8 @@ func (s *RepositoryTestSuite) TestFindByText(t *testing.T) {
 	assert.NotNil(t, foundWord)
 	assert.Equal(t, testWord.Text, foundWord.Text)
 	assert.Equal(t, testWord.Language, foundWord.Language)
-	assert.Equal(t, testWord.Definitions, foundWord.Definitions)
+	assert.Equal(t, testWord.Definitions[0].Text, foundWord.Definitions[0].Text)
+	assert.Equal(t, testWord.Definitions[0].WordType, foundWord.Definitions[0].WordType)
 }
 
 // TestFindByText_NotFound tests the FindByText method when the word doesn't exist
@@ -57,7 +63,12 @@ func (s *RepositoryTestSuite) TestSave(t *testing.T) {
 	testWord := &Word{
 		Text:     "save_test",
 		Language: "en",
-		Definitions: []string{"to keep safe or rescue from harm or danger"},
+		Definitions: []Definition{
+			{
+				Text:     "to keep safe or rescue from harm or danger",
+				WordType: "verb",
+			},
+		},
 	}
 
 	// Execute
@@ -80,7 +91,12 @@ func (s *RepositoryTestSuite) TestSave_Update(t *testing.T) {
 	testWord := &Word{
 		Text:     "update_test",
 		Language: "en",
-		Definitions: []string{"original definition"},
+		Definitions: []Definition{
+			{
+				Text:     "original definition",
+				WordType: "noun",
+			},
+		},
 	}
 
 	// Save the word first
@@ -88,7 +104,12 @@ func (s *RepositoryTestSuite) TestSave_Update(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Update the word
-	testWord.Definitions = []string{"updated definition"}
+	testWord.Definitions = []Definition{
+		{
+			Text:     "updated definition",
+			WordType: "noun",
+		},
+	}
 	err = s.Repo.Save(ctx, testWord)
 	assert.NoError(t, err)
 
@@ -96,7 +117,7 @@ func (s *RepositoryTestSuite) TestSave_Update(t *testing.T) {
 	foundWord, err := s.Repo.FindByText(ctx, "update_test", "en")
 	assert.NoError(t, err)
 	assert.NotNil(t, foundWord)
-	assert.Equal(t, []string{"updated definition"}, foundWord.Definitions)
+	assert.Equal(t, "updated definition", foundWord.Definitions[0].Text)
 }
 
 // TestList tests the List method of a Repository implementation
@@ -106,9 +127,9 @@ func (s *RepositoryTestSuite) TestList(t *testing.T) {
 	
 	// Save some test words
 	testWords := []*Word{
-		{Text: "list_test1", Language: "en", Definitions: []string{"test 1"}},
-		{Text: "list_test2", Language: "en", Definitions: []string{"test 2"}},
-		{Text: "list_test3", Language: "fr", Definitions: []string{"test 3"}},
+		{Text: "list_test1", Language: "en", Definitions: []Definition{{Text: "test 1", WordType: "noun"}}},
+		{Text: "list_test2", Language: "en", Definitions: []Definition{{Text: "test 2", WordType: "noun"}}},
+		{Text: "list_test3", Language: "fr", Definitions: []Definition{{Text: "test 3", WordType: "noun"}}},
 	}
 	
 	for _, w := range testWords {
