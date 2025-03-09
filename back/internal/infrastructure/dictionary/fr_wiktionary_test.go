@@ -40,13 +40,13 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 	if len(word.Definitions) > 0 {
 		def := word.Definitions[0]
 		assert.NotEmpty(t, def.Text, "Definition text should not be empty")
-		
+
 		// These fields might not always be populated depending on the word
 		// So we don't assert they're not empty, just check them if they exist
 		if def.Pronunciation != "" {
 			t.Logf("Found pronunciation: %s", def.Pronunciation)
 		}
-		
+
 		if len(def.LanguageSpecifics) > 0 {
 			t.Logf("Found language specifics: %v", def.LanguageSpecifics)
 		}
@@ -81,7 +81,7 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 	// Check search terms
 	assert.NotEmpty(t, word.SearchTerms, "SearchTerms should be populated")
 	assert.Contains(t, word.SearchTerms, "maison", "Main word should be in search terms")
-	
+
 	// Lemma might not always be set
 	if word.Lemma != "" {
 		t.Logf("Found lemma: %s", word.Lemma)
@@ -327,12 +327,12 @@ func containsString(slice []string, str string) bool {
 func TestWord_EntityMethods(t *testing.T) {
 	// Create a new word
 	word := wordDomain.NewWord("test", "fr")
-	
+
 	// Test SetLemma
 	word.SetLemma("tester")
 	assert.Equal(t, "tester", word.Lemma)
 	assert.Contains(t, word.SearchTerms, "tester")
-	
+
 	// Test AddDefinition
 	def := wordDomain.NewDefinition()
 	def.Text = "A test definition"
@@ -342,16 +342,16 @@ func TestWord_EntityMethods(t *testing.T) {
 	def.Pronunciation = "/tɛst/"
 	def.LanguageSpecifics = map[string]string{"plural": "tests"}
 	def.Notes = []string{"This is a test note"}
-	
+
 	word.AddDefinition(def)
 	assert.Len(t, word.Definitions, 1)
 	assert.Equal(t, "A test definition", word.Definitions[0].Text)
 	assert.Contains(t, word.SearchTerms, "tests")
-	
+
 	// Test AddSearchTerm
 	word.AddSearchTerm("testing")
 	assert.Contains(t, word.SearchTerms, "testing")
-	
+
 	// Test adding duplicate search term
 	word.AddSearchTerm("testing")
 	count := 0
@@ -361,11 +361,11 @@ func TestWord_EntityMethods(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, count, "Duplicate search term should not be added")
-	
+
 	// Test AddSynonym
 	word.AddSynonym("examination")
 	assert.Contains(t, word.Synonyms, "examination")
-	
+
 	// Test adding duplicate synonym
 	word.AddSynonym("examination")
 	count = 0
@@ -375,11 +375,11 @@ func TestWord_EntityMethods(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, count, "Duplicate synonym should not be added")
-	
+
 	// Test AddAntonym
 	word.AddAntonym("ignorance")
 	assert.Contains(t, word.Antonyms, "ignorance")
-	
+
 	// Test adding duplicate antonym
 	word.AddAntonym("ignorance")
 	count = 0
@@ -389,39 +389,39 @@ func TestWord_EntityMethods(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, count, "Duplicate antonym should not be added")
-	
+
 	// Test GetPrimaryWordType
 	assert.Equal(t, "noun", word.GetPrimaryWordType())
-	
+
 	// Test GetAllSpecifics
 	specifics := word.GetAllSpecifics()
 	assert.Contains(t, specifics, "tests")
-	
+
 	// Test GetDefinitionsByType
 	nounDefs := word.GetDefinitionsByType("noun")
 	assert.Len(t, nounDefs, 1)
 	assert.Equal(t, "A test definition", nounDefs[0].Text)
-	
+
 	verbDefs := word.GetDefinitionsByType("verb")
 	assert.Len(t, verbDefs, 0)
-	
+
 	// Test ValidateDefinition with valid values
 	validDef := wordDomain.NewDefinition()
-	validDef.WordType = "noun"
-	validDef.Gender = "feminine" // Use a valid gender for French
+	validDef.WordType = "nom"
+	validDef.Gender = "féminin" // Use a valid gender for French
 	err := word.ValidateDefinition(validDef)
 	assert.NoError(t, err)
-	
+
 	// Test with invalid word type
 	invalidTypeDef := wordDomain.NewDefinition()
 	invalidTypeDef.WordType = "invalid_type"
 	err = word.ValidateDefinition(invalidTypeDef)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, wordDomain.ErrInvalidWordType)
-	
+
 	// Test with invalid gender
 	invalidGenderDef := wordDomain.NewDefinition()
-	invalidGenderDef.WordType = "noun" // Set a valid word type
+	invalidGenderDef.WordType = "nom" // Set a valid word type
 	invalidGenderDef.Gender = "invalid_gender"
 	err = word.ValidateDefinition(invalidGenderDef)
 	assert.Error(t, err)
