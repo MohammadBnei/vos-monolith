@@ -23,13 +23,13 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 	// Create a test API with real Wiktionary URL
 	api := createTestAPI(t)
 
-	// Fetch the word
-	word, err := api.FetchWord(context.Background(), "test", "fr")
+	// Test with a real French word
+	word, err := api.FetchWord(context.Background(), "maison", "fr")
 	assert.NoError(t, err)
 	require.NotNil(t, word, "Word should not be nil")
 
-	// Verify the word data
-	assert.Equal(t, "test", word.Text)
+	// Verify basic word data
+	assert.Equal(t, "maison", word.Text)
 	assert.Equal(t, "fr", word.Language)
 
 	// Check that we have definitions
@@ -39,9 +39,22 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 	if len(word.Definitions) > 0 {
 		def := word.Definitions[0]
 		assert.NotEmpty(t, def.Text, "Definition text should not be empty")
+		assert.NotEmpty(t, def.Pronunciation, "Pronunciation should be set")
+		assert.NotEmpty(t, def.LanguageSpecifics, "LanguageSpecifics should be populated")
+		
 		// If the definition has examples, check them
 		if len(def.Examples) > 0 {
 			assert.NotEmpty(t, def.Examples[0], "Example should not be empty")
+		}
+		
+		// Validate French-specific fields
+		if def.WordType != "" {
+			assert.True(t, french.IsValidWordType(french.WordType(def.WordType)), 
+				"Word type should be valid for French")
+		}
+		if def.Gender != "" {
+			assert.True(t, french.IsValidGender(french.Gender(def.Gender)), 
+				"Gender should be valid for French")
 		}
 	}
 
@@ -50,6 +63,11 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 
 	// Check that we have an etymology
 	assert.NotEmpty(t, word.Etymology, "Should have etymology")
+
+	// Check search terms and lemma
+	assert.NotEmpty(t, word.SearchTerms, "SearchTerms should be populated")
+	assert.Contains(t, word.SearchTerms, "maison", "Main word should be in search terms")
+	assert.NotEmpty(t, word.Lemma, "Lemma should be set")
 
 	// Check that the timestamps are set
 	assert.False(t, word.CreatedAt.IsZero(), "CreatedAt should be set")
