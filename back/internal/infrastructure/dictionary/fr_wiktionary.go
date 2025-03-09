@@ -121,6 +121,41 @@ func (w *FrenchWiktionaryAPI) FetchRelatedWords(ctx context.Context, word *wordD
 	return relatedWords, nil
 }
 
+func (w *FrenchWiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]*wordDomain.Word, error) {
+	w.logger.Debug().Str("prefix", prefix).Str("language", language).Msg("Fetching suggestions from French Wiktionary")
+
+	// Validate language
+	if language != "fr" {
+		w.logger.Warn().Str("language", language).Msg("Unsupported language for French Wiktionary")
+		return nil, fmt.Errorf("unsupported language %s", language)
+	}
+
+	// Create a collector for the suggestion page
+	c := colly.NewCollector(
+		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+		colly.MaxDepth(1),
+	)
+
+	// Set timeout
+	c.SetRequestTimeout(5 * time.Second)
+
+	// Store suggestions
+	suggestions := []*wordDomain.Word{}
+
+	// TODO: Implement the actual scraping logic
+	// This is a placeholder for you to implement the scraping logic
+	// You'll need to:
+	// 1. Visit the Wiktionary search page with the prefix
+	// 2. Extract the suggestion results
+	// 3. Create lightweight Word objects for each suggestion
+	
+	// Example URL to visit: https://fr.wiktionary.org/w/index.php?title=Sp%C3%A9cial:Recherche&profile=default&fulltext=0&search=prefix
+
+	// Return the empty suggestions for now
+	return suggestions, nil
+}
+}
+
 // FetchWord retrieves word information from French Wiktionary by scraping the web page
 func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*wordDomain.Word, error) {
 	w.logger.Debug().Str("text", text).Str("language", language).Msg("Fetching word from French Wiktionary")
