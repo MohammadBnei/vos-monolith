@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	wordDomain "voconsteroid/internal/domain/word"
+	"voconsteroid/internal/domain/word/languages/french"
 )
 
 // Helper function to create a test API with real Wiktionary URL
@@ -41,19 +42,19 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 		assert.NotEmpty(t, def.Text, "Definition text should not be empty")
 		assert.NotEmpty(t, def.Pronunciation, "Pronunciation should be set")
 		assert.NotEmpty(t, def.LanguageSpecifics, "LanguageSpecifics should be populated")
-		
+
 		// If the definition has examples, check them
 		if len(def.Examples) > 0 {
 			assert.NotEmpty(t, def.Examples[0], "Example should not be empty")
 		}
-		
+
 		// Validate French-specific fields
 		if def.WordType != "" {
-			assert.True(t, french.IsValidWordType(french.WordType(def.WordType)), 
+			assert.True(t, french.IsValidWordType(french.WordType(def.WordType)),
 				"Word type should be valid for French")
 		}
 		if def.Gender != "" {
-			assert.True(t, french.IsValidGender(french.Gender(def.Gender)), 
+			assert.True(t, french.IsValidGender(french.Gender(def.Gender)),
 				"Gender should be valid for French")
 		}
 	}
