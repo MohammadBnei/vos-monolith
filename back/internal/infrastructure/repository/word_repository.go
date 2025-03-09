@@ -36,7 +36,7 @@ func NewWordRepository(db DBInterface, logger zerolog.Logger) *WordRepository {
 // FindByText retrieves a word by its text and language
 func (r *WordRepository) FindByText(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
-		SELECT id, text, language, definitions, pronunciation, etymology, translations, 
+		SELECT id, text, language, definitions, etymology, translations, 
 		       search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE text = $1 AND language = $2
@@ -52,7 +52,6 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 		&w.Text,
 		&w.Language,
 		&definitionsJSON,
-		&w.Pronunciation,
 		&w.Etymology,
 		&translations,
 		&searchTerms,
@@ -82,7 +81,7 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 // FindByAnyForm retrieves a word by any of its forms (using search terms)
 func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
-		SELECT id, text, language, definitions, pronunciation, etymology, translations, 
+		SELECT id, text, language, definitions, etymology, translations, 
 		        search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE language = $1 AND $2 = ANY(search_terms)
@@ -98,7 +97,6 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 		&w.Text,
 		&w.Language,
 		&definitionsJSON,
-		&w.Pronunciation,
 		&w.Etymology,
 		&translations,
 		&searchTerms,
@@ -175,7 +173,7 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}, limit, offset int) ([]*word.Word, error) {
 	// Build query with filters
 	query := `
-		SELECT id, text, language, definitions, pronunciation, etymology, translations, 
+		SELECT id, text, language, definitions, etymology, translations, 
 		        search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE 1=1
@@ -222,7 +220,6 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 			&w.Language,
 			&definitionsJSON,
 
-			&w.Pronunciation,
 			&w.Etymology,
 			&translations,
 			&searchTerms,
