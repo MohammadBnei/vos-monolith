@@ -111,7 +111,7 @@ func TestSearch_ExistingWord(t *testing.T) {
 
 	// Expect repository to find the word by text first
 	repo.On("FindByText", ctx, "test", "en").Return(expectedWord, nil)
-	
+
 	// Add expectation for FindByAnyForm (won't be called but needs to be mocked)
 	repo.On("FindByAnyForm", ctx, "test", "en").Return(nil, errors.New("not found"))
 
@@ -123,7 +123,7 @@ func TestSearch_ExistingWord(t *testing.T) {
 	assert.Equal(t, expectedWord, word)
 	repo.AssertExpectations(t)
 	dictAPI.AssertNotCalled(t, "FetchWord")
-	
+
 	// Verify that FindByAnyForm was not called since we found the word by text
 	repo.AssertNotCalled(t, "FindByAnyForm")
 }
@@ -141,7 +141,7 @@ func TestSearch_NewWord(t *testing.T) {
 
 	// Expect repository to not find the word by text
 	repo.On("FindByText", ctx, "test", "en").Return(nil, errors.New("not found"))
-	
+
 	// Expect repository to not find the word by any form
 	repo.On("FindByAnyForm", ctx, "test", "en").Return(nil, errors.New("not found"))
 
@@ -188,7 +188,7 @@ func TestSearch_APIError(t *testing.T) {
 
 	// Expect repository to not find the word by text
 	repo.On("FindByText", ctx, "test", "en").Return(nil, errors.New("not found"))
-	
+
 	// Expect repository to not find the word by any form
 	repo.On("FindByAnyForm", ctx, "test", "en").Return(nil, errors.New("not found"))
 
@@ -278,27 +278,21 @@ func TestAutoComplete(t *testing.T) {
 	repo, dictAPI, svc := setupTestService(t)
 
 	ctx := context.Background()
-	
+
 	// Create test data
 	localWords := []*Word{
 		{Text: "test1", Language: "en"},
 		{Text: "test2", Language: "en"},
 	}
-	
+
 	apiWords := []*Word{
 		{Text: "test2", Language: "en"}, // Duplicate that should be deduplicated
-		{Text: "test3", Language: "en"},
-	}
-	
-	expectedWords := []*Word{
-		{Text: "test1", Language: "en"},
-		{Text: "test2", Language: "en"},
 		{Text: "test3", Language: "en"},
 	}
 
 	// Expect repository to find words by prefix
 	repo.On("FindByPrefix", ctx, "test", "en", 5).Return(localWords, nil)
-	
+
 	// Expect dictionary API to fetch suggestions
 	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(apiWords, nil)
 
@@ -308,12 +302,12 @@ func TestAutoComplete(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.Len(t, results, 3)
-	
+
 	// Check that results are sorted alphabetically
-	assert.Equal(t, "test1", results[0].Text)
-	assert.Equal(t, "test2", results[1].Text)
-	assert.Equal(t, "test3", results[2].Text)
-	
+	assert.Equal(t, "test1", results[0])
+	assert.Equal(t, "test2", results[1])
+	assert.Equal(t, "test3", results[2])
+
 	repo.AssertExpectations(t)
 	dictAPI.AssertExpectations(t)
 }
@@ -331,7 +325,7 @@ func TestAutoComplete_ShortPrefix(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, ErrInvalidWord, err)
 	assert.Nil(t, results)
-	
+
 	// Verify no calls were made
 	repo.AssertNotCalled(t, "FindByPrefix")
 	dictAPI.AssertNotCalled(t, "FetchSuggestions")
@@ -343,7 +337,7 @@ func TestAutoComplete_RepositoryError(t *testing.T) {
 
 	ctx := context.Background()
 	repoErr := errors.New("repository error")
-	
+
 	// Create test data for API
 	apiWords := []*Word{
 		{Text: "test3", Language: "en"},
@@ -351,7 +345,7 @@ func TestAutoComplete_RepositoryError(t *testing.T) {
 
 	// Expect repository to return an error
 	repo.On("FindByPrefix", ctx, "test", "en", 5).Return(nil, repoErr)
-	
+
 	// API should still be called and succeed
 	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(apiWords, nil)
 
@@ -361,8 +355,8 @@ func TestAutoComplete_RepositoryError(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.Len(t, results, 1)
-	assert.Equal(t, "test3", results[0].Text)
-	
+	assert.Equal(t, "test3", results[0])
+
 	repo.AssertExpectations(t)
 	dictAPI.AssertExpectations(t)
 }
@@ -373,7 +367,7 @@ func TestAutoComplete_APIError(t *testing.T) {
 
 	ctx := context.Background()
 	apiErr := errors.New("API error")
-	
+
 	// Create test data for repository
 	localWords := []*Word{
 		{Text: "test1", Language: "en"},
@@ -381,7 +375,7 @@ func TestAutoComplete_APIError(t *testing.T) {
 
 	// Repository should succeed
 	repo.On("FindByPrefix", ctx, "test", "en", 5).Return(localWords, nil)
-	
+
 	// API should fail
 	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(nil, apiErr)
 
@@ -391,8 +385,8 @@ func TestAutoComplete_APIError(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.Len(t, results, 1)
-	assert.Equal(t, "test1", results[0].Text)
-	
+	assert.Equal(t, "test1", results[0])
+
 	repo.AssertExpectations(t)
 	dictAPI.AssertExpectations(t)
 }

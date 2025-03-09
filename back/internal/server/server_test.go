@@ -65,12 +65,12 @@ func (m *MockWordService) GetRecentWords(ctx context.Context, language string, l
 	return args.Get(0).([]*word.Word), args.Error(1)
 }
 
-func (m *MockWordService) AutoComplete(ctx context.Context, prefix, language string) ([]*word.Word, error) {
+func (m *MockWordService) AutoComplete(ctx context.Context, prefix, language string) ([]string, error) {
 	args := m.Called(ctx, prefix, language)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*word.Word), args.Error(1)
+	return args.Get(0).([]string), args.Error(1)
 }
 
 func TestNewServer(t *testing.T) {
@@ -366,8 +366,8 @@ func TestAutoComplete(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, response.Suggestions)
 	assert.Len(t, response.Suggestions, 2)
-	assert.Equal(t, "test1", response.Suggestions[0].Text)
-	assert.Equal(t, "test2", response.Suggestions[1].Text)
+	assert.Equal(t, "test1", response.Suggestions[0])
+	assert.Equal(t, "test2", response.Suggestions[1])
 
 	// Verify mock was called
 	wordService.AssertExpectations(t)

@@ -33,12 +33,12 @@ func (m *MockDictionaryAPI) FetchRelatedWords(ctx context.Context, word *wordDom
 	return args.Get(0).(*wordDomain.RelatedWords), args.Error(1)
 }
 
-func (m *MockDictionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]*wordDomain.Word, error) {
+func (m *MockDictionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]string, error) {
 	args := m.Called(ctx, prefix, language)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*wordDomain.Word), args.Error(1)
+	return args.Get(0).([]string), args.Error(1)
 }
 
 func TestNewWiktionaryAPI(t *testing.T) {
