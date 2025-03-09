@@ -36,15 +36,15 @@ func NewWordRepository(db DBInterface, logger zerolog.Logger) *WordRepository {
 // FindByText retrieves a word by its text and language
 func (r *WordRepository) FindByText(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
-		SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
-		       word_type, search_terms, lemma, created_at, updated_at
+		SELECT id, text, language, definitions, pronunciation, etymology, translations, 
+		       search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE text = $1 AND language = $2
 	`
 
 	var w word.Word
 	var definitionsJSON []byte
-	var examples, searchTerms []string
+	var searchTerms []string
 	var translations map[string]string
 
 	err := r.db.QueryRow(ctx, query, text, language).Scan(
@@ -52,11 +52,9 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 		&w.Text,
 		&w.Language,
 		&definitionsJSON,
-		&examples,
 		&w.Pronunciation,
 		&w.Etymology,
 		&translations,
-		&w.WordType,
 		&searchTerms,
 		&w.Lemma,
 		&w.CreatedAt,
@@ -75,7 +73,6 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 		return nil, fmt.Errorf("failed to parse definitions: %w", err)
 	}
 
-	w.Examples = examples
 	w.SearchTerms = searchTerms
 	w.Translations = translations
 
@@ -85,15 +82,15 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 // FindByAnyForm retrieves a word by any of its forms (using search terms)
 func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
-		SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
-		       word_type, search_terms, lemma, created_at, updated_at
+		SELECT id, text, language, definitions, pronunciation, etymology, translations, 
+		        search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE language = $1 AND $2 = ANY(search_terms)
 	`
 
 	var w word.Word
 	var definitionsJSON []byte
-	var examples, searchTerms []string
+	var searchTerms []string
 	var translations map[string]string
 
 	err := r.db.QueryRow(ctx, query, language, text).Scan(
@@ -101,11 +98,9 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 		&w.Text,
 		&w.Language,
 		&definitionsJSON,
-		&examples,
 		&w.Pronunciation,
 		&w.Etymology,
 		&translations,
-		&w.WordType,
 		&searchTerms,
 		&w.Lemma,
 		&w.CreatedAt,
@@ -124,7 +119,6 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 		return nil, fmt.Errorf("failed to parse definitions: %w", err)
 	}
 
-	w.Examples = examples
 	w.SearchTerms = searchTerms
 	w.Translations = translations
 
@@ -135,21 +129,20 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 	query := `
 		INSERT INTO words (
-			text, language, definitions, examples, pronunciation, etymology, translations, 
-			word_type, search_terms, lemma, created_at, updated_at
+			text, language, definitions, pronunciation, etymology, translations, 
+			 search_terms, lemma, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (text, language) 
 		DO UPDATE SET 
 			definitions = $3,
-			examples = $4,
-			pronunciation = $5,
-			etymology = $6,
-			translations = $7,
-			word_type = $8,
-			search_terms = $9,
-			lemma = $10,
-			updated_at = $12
+			pronunciation = $4,
+			etymology = $5,
+			translations = $6,
+			word_type = $7,
+			search_terms = $8,
+			lemma = $9,
+			updated_at = $10
 		RETURNING id
 	`
 
@@ -169,11 +162,9 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 		w.Text,
 		w.Language,
 		definitionsJSON,
-		w.Examples,
 		w.Pronunciation,
 		w.Etymology,
 		w.Translations,
-		w.WordType,
 		w.SearchTerms,
 		w.Lemma,
 		w.CreatedAt,
@@ -185,8 +176,8 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}, limit, offset int) ([]*word.Word, error) {
 	// Build query with filters
 	query := `
-		SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
-		       word_type, search_terms, lemma, created_at, updated_at
+		SELECT id, text, language, definitions, pronunciation, etymology, translations, 
+		        search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE 1=1
 	`
@@ -223,7 +214,7 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 	for rows.Next() {
 		var w word.Word
 		var definitionsJSON []byte
-		var examples, searchTerms []string
+		var searchTerms []string
 		var translations map[string]string
 
 		err := rows.Scan(
@@ -231,11 +222,10 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 			&w.Text,
 			&w.Language,
 			&definitionsJSON,
-			&examples,
+
 			&w.Pronunciation,
 			&w.Etymology,
 			&translations,
-			&w.WordType,
 			&searchTerms,
 			&w.Lemma,
 			&w.CreatedAt,
@@ -251,7 +241,6 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 			return nil, fmt.Errorf("failed to parse definitions: %w", err)
 		}
 
-		w.Examples = examples
 		w.SearchTerms = searchTerms
 		w.Translations = translations
 
