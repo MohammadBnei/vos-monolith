@@ -25,6 +25,17 @@ type RecentWordsResponse struct {
 	Words []*word.Word `json:"words"`
 }
 
+// AutoCompleteRequest represents a request for autocomplete suggestions
+type AutoCompleteRequest struct {
+	Prefix   string `form:"q" binding:"required,min=2"`
+	Language string `form:"lang" binding:"omitempty,oneof=en fr"`
+}
+
+// AutoCompleteResponse represents the response for autocomplete suggestions
+type AutoCompleteResponse struct {
+	Suggestions []*word.Word `json:"suggestions"`
+}
+
 // SearchWord handles requests to search for a word
 func (s *Server) SearchWord(c *gin.Context) {
 	log := c.MustGet("logger").(zerolog.Logger)
@@ -82,6 +93,42 @@ func (s *Server) GetRecentWords(c *gin.Context) {
 	if language == "" {
 		language = "en" // Default to English
 	}
+
+// AutoComplete handles requests for autocomplete suggestions
+func (s *Server) AutoComplete(c *gin.Context) {
+	log := c.MustGet("logger").(zerolog.Logger)
+
+	var req AutoCompleteRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		log.Debug().Err(err).Msg("Invalid autocomplete request")
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Status:  http.StatusBadRequest,
+			Message: "Invalid request",
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	// Default to English if no language specified
+	if req.Language == "" {
+		req.Language = "en"
+	}
+
+	suggestions, err := s.wordService.AutoComplete(c.Request.Context(), req.Prefix, req.Language)
+	if err != nil {
+		log.Debug().Err(err).Str("prefix", req.Prefix).Str("language", req.Language).Msg("Failed to get autocomplete suggestions")
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Status:  http.StatusInternalServerError,
+			Message: "Failed to get suggestions",
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, AutoCompleteResponse{
+		Suggestions: suggestions,
+	})
+}
 
 	// Get recent words
 	recentWords, err := s.wordService.GetRecentWords(c.Request.Context(), language, 10)

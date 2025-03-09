@@ -17,4 +17,7 @@ type Repository interface {
 
 	// List retrieves words with optional filtering
 	List(ctx context.Context, filter map[string]interface{}, limit, offset int) ([]*Word, error)
+
+	// FindByPrefix retrieves words by prefix and language
+	FindByPrefix(ctx context.Context, prefix, language string, limit int) ([]*Word, error)
 }

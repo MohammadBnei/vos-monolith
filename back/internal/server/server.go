@@ -130,6 +130,7 @@ func (s *Server) setupRoutes() {
 		{
 			words.POST("/search", s.SearchWord)
 			words.GET("/recent", s.GetRecentWords)
+			words.GET("/autocomplete", s.AutoComplete)
 		}
 	}
 }

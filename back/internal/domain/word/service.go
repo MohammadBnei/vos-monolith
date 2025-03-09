@@ -17,6 +17,9 @@ type Service interface {
 	
 	// GetRelatedWords finds words related to the given word (synonyms, antonyms)
 	GetRelatedWords(ctx context.Context, wordID string) (*RelatedWords, error)
+	
+	// AutoComplete provides autocomplete suggestions based on prefix and language
+	AutoComplete(ctx context.Context, prefix, language string) ([]*Word, error)
 }
 
 // RelatedWords groups words related to a specific word
@@ -113,6 +116,43 @@ func (s *service) GetRecentWords(ctx context.Context, language string, limit int
 // GetRelatedWords finds words related to the given word
 func (s *service) GetRelatedWords(ctx context.Context, wordID string) (*RelatedWords, error) {
 	s.logger.Debug().Str("wordID", wordID).Msg("Getting related words")
+
+func (s *service) AutoComplete(ctx context.Context, prefix, language string) ([]*Word, error) {
+	if len(prefix) < 2 {
+		return nil, ErrInvalidWord
+	}
+
+	s.logger.Debug().Str("prefix", prefix).Str("language", language).Msg("Getting autocomplete suggestions")
+
+	// Get local results (fail silently to continue with API results if DB fails)
+	localResults, _ := s.repo.FindByPrefix(ctx, prefix, language, 5)
+	
+	// Get external suggestions (fail silently to continue with local results if API fails)
+	apiResults, _ := s.dictAPI.FetchSuggestions(ctx, prefix, language)
+
+	// Merge and deduplicate results
+	combined := make(map[string]*Word)
+	for _, result := range append(localResults, apiResults...) {
+		key := fmt.Sprintf("%s|%s", result.Text, result.Language)
+		if _, exists := combined[key]; !exists {
+			combined[key] = result
+		}
+	}
+
+	// Convert map to slice and sort by relevance
+	finalResults := make([]*Word, 0, len(combined))
+	for _, word := range combined {
+		finalResults = append(finalResults, word)
+	}
+
+	// Sort alphabetically as a baseline
+	sort.Slice(finalResults, func(i, j int) bool {
+		return finalResults[i].Text < finalResults[j].Text
+	})
+
+	s.logger.Debug().Int("count", len(finalResults)).Msg("Returning autocomplete suggestions")
+	return finalResults, nil
+}
 	
 	// First, get the source word
 	filter := map[string]interface{}{

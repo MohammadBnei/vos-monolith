@@ -169,6 +169,63 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 }
 
 // List retrieves words with optional filtering
+func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language string, limit int) ([]*word.Word, error) {
+	query := `
+		SELECT id, text, language, definitions, etymology, 
+		       translations, search_terms, lemma, created_at, updated_at
+		FROM words
+		WHERE language = $1 
+		  AND EXISTS (SELECT 1 FROM unnest(search_terms) AS term 
+		         WHERE term ILIKE $2 || '%')
+		ORDER BY text <-> $2  -- Use pg_trgm similarity operator
+		LIMIT $3
+	`
+	
+	var words []*word.Word
+	rows, err := r.db.Query(ctx, query, language, prefix, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query words by prefix: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var w word.Word
+		var definitionsJSON []byte
+		var searchTerms []string
+		var translations map[string]string
+
+		if err := rows.Scan(
+			&w.ID,
+			&w.Text,
+			&w.Language,
+			&definitionsJSON,
+			&w.Etymology,
+			&translations,
+			&searchTerms,
+			&w.Lemma,
+			&w.CreatedAt,
+			&w.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan word row: %w", err)
+		}
+
+		if err := json.Unmarshal(definitionsJSON, &w.Definitions); err != nil {
+			return nil, fmt.Errorf("failed to parse definitions: %w", err)
+		}
+
+		w.SearchTerms = searchTerms
+		w.Translations = translations
+
+		words = append(words, &w)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating word rows: %w", err)
+	}
+
+	return words, nil
+}
+
 func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}, limit, offset int) ([]*word.Word, error) {
 	// Build query with filters
 	query := `
