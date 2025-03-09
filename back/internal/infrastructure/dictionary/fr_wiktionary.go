@@ -480,8 +480,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 									examples = append(examples, exampleText)
 									seenExamples[exampleText] = true
 
-									// Also add to the word's general examples
-									newWord.Examples = append(newWord.Examples, exampleText)
 								}
 							}
 						})

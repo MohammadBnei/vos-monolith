@@ -120,13 +120,6 @@ func createTestWord() *word.Word {
 				Examples: []string{"the car has passed its test"},
 			},
 		},
-		Examples: []string{
-			"we need to test this code",
-			"testing is important",
-		},
-		Pronunciation: map[string]string{
-			"IPA": "/tɛst/",
-		},
 		Etymology:    "from Latin testum, meaning 'earthen pot'",
 		Translations: map[string]string{"fr": "test", "es": "prueba"},
 		SearchTerms:  []string{"test", "tests"},
