@@ -140,6 +140,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/words/autocomplete:
+    get:
+      tags:
+        - words
+      summary: Get autocomplete suggestions
+      description: Retrieve word suggestions based on a prefix
+      operationId: autoComplete
+      parameters:
+        - name: q
+          in: query
+          description: The prefix to search for
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - name: lang
+          in: query
+          description: Language code
+          required: false
+          schema:
+            type: string
+            enum: [fr, en]
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoCompleteResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /health:
     get:
       tags:
@@ -349,6 +391,30 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Word'
+    
+    AutoCompleteRequest:
+      type: object
+      properties:
+        prefix:
+          type: string
+          description: The prefix to search for
+          minLength: 2
+        language:
+          type: string
+          description: Language code
+          enum: [fr, en]
+      required:
+        - prefix
+        - language
+    
+    AutoCompleteResponse:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            type: string
+          description: List of matching suggestions
     
     ErrorResponse:
       type: object
