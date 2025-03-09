@@ -83,9 +83,14 @@ func TestServerWithWordAPI(t *testing.T) {
 	// Mock the GetRecentWords method for the /api/v1/words/recent endpoint
 	testWords := []*word.Word{
 		{
-			Text:        "example",
-			Language:    "en",
-			Definitions: []string{"a representative form or pattern"},
+			Text:     "example",
+			Language: "en",
+			Definitions: []word.Definition{
+				{
+					Text:     "a representative form or pattern",
+					WordType: "noun",
+				},
+			},
 		},
 	}
 	wordService.On("GetRecentWords", mock.Anything, "en", 10).Return(testWords, nil)
