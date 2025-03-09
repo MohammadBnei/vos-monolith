@@ -72,7 +72,7 @@ func (w *WiktionaryAPI) FetchRelatedWords(ctx context.Context, word *wordDomain.
 }
 
 // FetchSuggestions routes the request to the appropriate language-specific scraper
-func (w *WiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]*wordDomain.Word, error) {
+func (w *WiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]string, error) {
 	w.logger.Debug().Str("prefix", prefix).Str("language", language).Msg("Routing suggestions fetch request")
 
 	// Get the language-specific scraper
