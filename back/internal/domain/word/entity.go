@@ -13,11 +13,14 @@ type Form struct {
 
 // Definition represents a single definition with its type and examples
 type Definition struct {
-	Text     string   `json:"text"`
-	WordType string   `json:"word_type,omitempty"` // noun, verb, adjective, etc.
-	Examples []string `json:"examples,omitempty"`
-	Register string   `json:"register,omitempty"` // formal, informal, slang, etc.
-	Notes    []string `json:"notes,omitempty"`
+	Text             string            `json:"text"`
+	WordType         string            `json:"word_type,omitempty"` // noun, verb, adjective, etc.
+	Examples         []string          `json:"examples,omitempty"`
+	Register         string            `json:"register,omitempty"` // formal, informal, slang, etc.
+	Gender           string            `json:"gender,omitempty"`
+	Prononciation    string            `json:"prononciation,omitempty"`
+	LangageSpecifics map[string]string `json:"language_specifics,omitempty"`
+	Notes            []string          `json:"notes,omitempty"`
 }
 
 // Word represents a vocabulary word with its definitions and metadata
@@ -33,7 +36,7 @@ type Word struct {
 	Synonyms      []string          `json:"synonyms,omitempty"`
 	Antonyms      []string          `json:"antonyms,omitempty"`
 	WordType      string            `json:"word_type,omitempty"` // Primary word type if multiple exist
-	Gender        string            `json:"gender,omitempty"`
+	Gender        string            `json:"gender,omitempty"`    // Primary gender if multiple exist
 	Forms         []Form            `json:"forms,omitempty"`
 	SearchTerms   []string          `json:"search_terms,omitempty"` // All searchable forms of the word
 	Lemma         string            `json:"lemma,omitempty"`        // Base form of the word
@@ -59,6 +62,15 @@ func NewWord(text, language string) *Word {
 		UsageNotes:    []string{},
 		CreatedAt:     now,
 		UpdatedAt:     now,
+	}
+}
+
+// NewDefinition returns a new, empty Definition structure.
+func NewDefinition() Definition {
+	return Definition{
+		Examples:         []string{},
+		LangageSpecifics: make(map[string]string),
+		Notes:            []string{},
 	}
 }
 
