@@ -103,6 +103,9 @@ func TestSearch_ExistingWord(t *testing.T) {
 
 	// Expect repository to find the word by text first
 	repo.On("FindByText", ctx, "test", "en").Return(expectedWord, nil)
+	
+	// Add expectation for FindByAnyForm (won't be called but needs to be mocked)
+	repo.On("FindByAnyForm", ctx, "test", "en").Return(nil, errors.New("not found"))
 
 	// Execute
 	word, err := svc.Search(ctx, "test", "en")
@@ -128,8 +131,11 @@ func TestSearch_NewWord(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	// Expect repository to not find the word
+	// Expect repository to not find the word by text
 	repo.On("FindByText", ctx, "test", "en").Return(nil, errors.New("not found"))
+	
+	// Expect repository to not find the word by any form
+	repo.On("FindByAnyForm", ctx, "test", "en").Return(nil, errors.New("not found"))
 
 	// Expect dictionary API to fetch the word
 	dictAPI.On("FetchWord", ctx, "test", "en").Return(expectedWord, nil)
@@ -161,6 +167,7 @@ func TestSearch_EmptyText(t *testing.T) {
 	assert.Equal(t, ErrInvalidWord, err)
 	assert.Nil(t, word)
 	repo.AssertNotCalled(t, "FindByText")
+	repo.AssertNotCalled(t, "FindByAnyForm")
 	dictAPI.AssertNotCalled(t, "FetchWord")
 }
 
@@ -171,8 +178,11 @@ func TestSearch_APIError(t *testing.T) {
 	ctx := context.Background()
 	apiErr := errors.New("API error")
 
-	// Expect repository to not find the word
+	// Expect repository to not find the word by text
 	repo.On("FindByText", ctx, "test", "en").Return(nil, errors.New("not found"))
+	
+	// Expect repository to not find the word by any form
+	repo.On("FindByAnyForm", ctx, "test", "en").Return(nil, errors.New("not found"))
 
 	// Expect dictionary API to return an error
 	dictAPI.On("FetchWord", ctx, "test", "en").Return(nil, apiErr)
