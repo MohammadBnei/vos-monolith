@@ -187,9 +187,14 @@ func TestSearchWord(t *testing.T) {
 
 	// Mock word service response
 	testWord := &word.Word{
-		Text:        "test",
-		Language:    "en",
-		Definitions: []string{"a procedure intended to establish quality"},
+		Text:     "test",
+		Language: "en",
+		Definitions: []word.Definition{
+			{
+				Text:     "a procedure intended to establish quality",
+				WordType: "noun",
+			},
+		},
 	}
 	wordService.On("Search", mock.Anything, "test", "en").Return(testWord, nil)
 
@@ -225,7 +230,8 @@ func TestSearchWord(t *testing.T) {
 	assert.NotNil(t, response.Word)
 	assert.Equal(t, "test", response.Word.Text)
 	assert.Equal(t, "en", response.Word.Language)
-	assert.Equal(t, "a procedure intended to establish quality", response.Word.Definitions[0])
+	assert.Equal(t, "a procedure intended to establish quality", response.Word.Definitions[0].Text)
+	assert.Equal(t, "noun", response.Word.Definitions[0].WordType)
 
 	// Verify mock was called
 	wordService.AssertExpectations(t)
@@ -248,8 +254,26 @@ func TestGetRecentWords(t *testing.T) {
 
 	// Mock word service response
 	testWords := []*word.Word{
-		{Text: "test1", Language: "en"},
-		{Text: "test2", Language: "en"},
+		{
+			Text:     "test1",
+			Language: "en",
+			Definitions: []word.Definition{
+				{
+					Text:     "test definition 1",
+					WordType: "noun",
+				},
+			},
+		},
+		{
+			Text:     "test2",
+			Language: "en",
+			Definitions: []word.Definition{
+				{
+					Text:     "test definition 2",
+					WordType: "verb",
+				},
+			},
+		},
 	}
 	wordService.On("GetRecentWords", mock.Anything, "en", 10).Return(testWords, nil)
 
