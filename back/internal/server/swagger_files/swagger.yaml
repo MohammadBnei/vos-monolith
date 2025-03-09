@@ -172,6 +172,17 @@ components:
         register:
           type: string
           description: Register information (formal, informal, slang, etc.)
+        gender:
+          type: string
+          description: Grammatical gender
+        prononciation:
+          type: string
+          description: Pronunciation specific to this definition
+        language_specifics:
+          type: object
+          additionalProperties:
+            type: string
+          description: Language-specific attributes
         notes:
           type: array
           items:
@@ -242,11 +253,30 @@ components:
           items:
             type: string
           description: List of antonyms
+        word_type:
+          type: string
+          description: Primary word type if multiple exist
+        gender:
+          type: string
+          description: Primary grammatical gender
         forms:
           type: array
           items:
             $ref: '#/components/schemas/Form'
           description: Different forms of the word
+        search_terms:
+          type: array
+          items:
+            type: string
+          description: All searchable forms of the word
+        lemma:
+          type: string
+          description: Base form of the word
+        usage_notes:
+          type: array
+          items:
+            type: string
+          description: General usage information
         created_at:
           type: string
           format: date-time
