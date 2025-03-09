@@ -2,6 +2,7 @@ package word
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -14,12 +15,12 @@ type Service interface {
 
 	// GetRecentWords retrieves recently searched words
 	GetRecentWords(ctx context.Context, language string, limit int) ([]*Word, error)
-	
+
 	// GetRelatedWords finds words related to the given word (synonyms, antonyms)
 	GetRelatedWords(ctx context.Context, wordID string) (*RelatedWords, error)
-	
+
 	// AutoComplete provides autocomplete suggestions based on prefix and language
-	AutoComplete(ctx context.Context, prefix, language string) ([]*Word, error)
+	AutoComplete(ctx context.Context, prefix, language string) ([]string, error)
 }
 
 // RelatedWords groups words related to a specific word
@@ -56,14 +57,14 @@ func (s *service) Search(ctx context.Context, text, language string) (*Word, err
 
 	// Normalize the input text (lowercase, trim spaces)
 	normalizedText := strings.ToLower(strings.TrimSpace(text))
-	
+
 	// Try to find by any form first (prioritizing user flexibility)
 	word, err := s.repo.FindByAnyForm(ctx, normalizedText, language)
 	if err == nil {
 		s.logger.Debug().Str("text", normalizedText).Str("found_form", word.Text).Msg("Word found in repository by form")
 		return word, nil
 	}
-	
+
 	// If not found by any form, try exact match as fallback
 	word, err = s.repo.FindByText(ctx, normalizedText, language)
 	if err == nil {
@@ -117,61 +118,24 @@ func (s *service) GetRecentWords(ctx context.Context, language string, limit int
 func (s *service) GetRelatedWords(ctx context.Context, wordID string) (*RelatedWords, error) {
 	s.logger.Debug().Str("wordID", wordID).Msg("Getting related words")
 
-func (s *service) AutoComplete(ctx context.Context, prefix, language string) ([]*Word, error) {
-	if len(prefix) < 2 {
-		return nil, ErrInvalidWord
-	}
-
-	s.logger.Debug().Str("prefix", prefix).Str("language", language).Msg("Getting autocomplete suggestions")
-
-	// Get local results (fail silently to continue with API results if DB fails)
-	localResults, _ := s.repo.FindByPrefix(ctx, prefix, language, 5)
-	
-	// Get external suggestions (fail silently to continue with local results if API fails)
-	apiResults, _ := s.dictAPI.FetchSuggestions(ctx, prefix, language)
-
-	// Merge and deduplicate results
-	combined := make(map[string]*Word)
-	for _, result := range append(localResults, apiResults...) {
-		key := fmt.Sprintf("%s|%s", result.Text, result.Language)
-		if _, exists := combined[key]; !exists {
-			combined[key] = result
-		}
-	}
-
-	// Convert map to slice and sort by relevance
-	finalResults := make([]*Word, 0, len(combined))
-	for _, word := range combined {
-		finalResults = append(finalResults, word)
-	}
-
-	// Sort alphabetically as a baseline
-	sort.Slice(finalResults, func(i, j int) bool {
-		return finalResults[i].Text < finalResults[j].Text
-	})
-
-	s.logger.Debug().Int("count", len(finalResults)).Msg("Returning autocomplete suggestions")
-	return finalResults, nil
-}
-	
 	// First, get the source word
 	filter := map[string]interface{}{
 		"id": wordID,
 	}
-	
+
 	words, err := s.repo.List(ctx, filter, 1, 0)
 	if err != nil || len(words) == 0 {
 		s.logger.Error().Err(err).Str("wordID", wordID).Msg("Failed to get source word")
 		return nil, ErrWordNotFound
 	}
-	
+
 	sourceWord := words[0]
 	result := &RelatedWords{
 		SourceWord: sourceWord,
 		Synonyms:   []*Word{},
 		Antonyms:   []*Word{},
 	}
-	
+
 	// Get synonyms
 	if len(sourceWord.Synonyms) > 0 {
 		for _, syn := range sourceWord.Synonyms {
@@ -182,7 +146,7 @@ func (s *service) AutoComplete(ctx context.Context, prefix, language string) ([]
 			}
 		}
 	}
-	
+
 	// Get antonyms
 	if len(sourceWord.Antonyms) > 0 {
 		for _, ant := range sourceWord.Antonyms {
@@ -193,12 +157,49 @@ func (s *service) AutoComplete(ctx context.Context, prefix, language string) ([]
 			}
 		}
 	}
-	
+
 	s.logger.Debug().
 		Str("wordID", wordID).
 		Int("synonyms", len(result.Synonyms)).
 		Int("antonyms", len(result.Antonyms)).
 		Msg("Retrieved related words")
-		
+
 	return result, nil
+}
+
+func (s *service) AutoComplete(ctx context.Context, prefix, language string) ([]string, error) {
+	if len(prefix) < 2 {
+		return nil, ErrInvalidWord
+	}
+
+	s.logger.Debug().Str("prefix", prefix).Str("language", language).Msg("Getting autocomplete suggestions")
+
+	// Get local results (fail silently to continue with API results if DB fails)
+	localResults, _ := s.repo.FindByPrefix(ctx, prefix, language, 5)
+
+	// Get external suggestions (fail silently to continue with local results if API fails)
+	apiResults, _ := s.dictAPI.FetchSuggestions(ctx, prefix, language)
+
+	// Merge results and sort by relevance
+	dedupMap := make(map[string]struct{})
+	for _, word := range localResults {
+		dedupMap[word.Text] = struct{}{}
+	}
+	for _, word := range apiResults {
+		dedupMap[word] = struct{}{}
+
+	}
+
+	finalResults := make([]string, 0, len(dedupMap))
+	for word := range dedupMap {
+		finalResults = append(finalResults, word)
+	}
+
+	// Sort alphabetically as a baseline
+	sort.Slice(finalResults, func(i, j int) bool {
+		return finalResults[i] < finalResults[j]
+	})
+
+	s.logger.Debug().Int("count", len(finalResults)).Msg("Returning autocomplete suggestions")
+	return finalResults, nil
 }

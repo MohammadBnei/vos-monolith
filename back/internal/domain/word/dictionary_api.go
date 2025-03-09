@@ -11,4 +11,7 @@ type DictionaryAPI interface {
 
 	// FetchRelatedWords retrieves words related to the given word
 	FetchRelatedWords(ctx context.Context, word *Word) (*RelatedWords, error)
+
+	// FetchSuggestions retrieves suggestions for a given prefix and language
+	FetchSuggestions(ctx context.Context, prefix, language string) ([]string, error)
 }

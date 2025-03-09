@@ -86,19 +86,3 @@ func (w *WiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, language s
 	// Delegate to the language-specific scraper
 	return scraper.FetchSuggestions(ctx, prefix, language)
 }
-
-// FetchSuggestions routes the request to the appropriate language-specific scraper
-func (w *WiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]*wordDomain.Word, error) {
-	w.logger.Debug().Str("prefix", prefix).Str("language", language).Msg("Routing suggestions fetch request")
-
-	// Get the language-specific scraper
-	scraper, exists := w.scrapers[language]
-	if !exists {
-		w.logger.Warn().Str("language", language).Msg("No specific scraper for language, using fallback")
-		// For now, return an error when no language-specific scraper exists
-		return nil, fmt.Errorf("unsupported language %s: %w", language, wordDomain.ErrWordNotFound)
-	}
-
-	// Delegate to the language-specific scraper
-	return scraper.FetchSuggestions(ctx, prefix, language)
-}

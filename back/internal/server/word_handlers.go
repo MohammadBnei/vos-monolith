@@ -33,7 +33,7 @@ type AutoCompleteRequest struct {
 
 // AutoCompleteResponse represents the response for autocomplete suggestions
 type AutoCompleteResponse struct {
-	Suggestions []*word.Word `json:"suggestions"`
+	Suggestions []string `json:"suggestions"`
 }
 
 // SearchWord handles requests to search for a word
@@ -94,7 +94,29 @@ func (s *Server) GetRecentWords(c *gin.Context) {
 		language = "en" // Default to English
 	}
 
-// AutoComplete handles requests for autocomplete suggestions
+	// AutoComplete handles requests for autocomplete suggestions
+
+	// Get recent words
+	recentWords, err := s.wordService.GetRecentWords(c.Request.Context(), language, 10)
+	if err != nil {
+		log.Debug().Err(err).Str("language", language).Msg("Failed to get recent words")
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Status:  http.StatusInternalServerError,
+			Message: "Failed to get recent words",
+			Error:   err.Error(),
+		})
+		return
+	}
+
+	// Return the words
+	c.JSON(http.StatusOK, RecentWordsResponse{
+		Words: recentWords,
+	})
+}
+
+// AutoComplete handles requests for autocomplete suggestions based on prefix and language.
+// If no language is specified, it defaults to English.
+// It returns an array of words that match the prefix.
 func (s *Server) AutoComplete(c *gin.Context) {
 	log := c.MustGet("logger").(zerolog.Logger)
 
@@ -127,23 +149,5 @@ func (s *Server) AutoComplete(c *gin.Context) {
 
 	c.JSON(http.StatusOK, AutoCompleteResponse{
 		Suggestions: suggestions,
-	})
-}
-
-	// Get recent words
-	recentWords, err := s.wordService.GetRecentWords(c.Request.Context(), language, 10)
-	if err != nil {
-		log.Debug().Err(err).Str("language", language).Msg("Failed to get recent words")
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Status:  http.StatusInternalServerError,
-			Message: "Failed to get recent words",
-			Error:   err.Error(),
-		})
-		return
-	}
-
-	// Return the words
-	c.JSON(http.StatusOK, RecentWordsResponse{
-		Words: recentWords,
 	})
 }
