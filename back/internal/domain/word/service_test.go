@@ -66,12 +66,12 @@ func (m *MockDictionaryAPI) FetchRelatedWords(ctx context.Context, word *Word) (
 	return args.Get(0).(*RelatedWords), args.Error(1)
 }
 
-func (m *MockDictionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]*Word, error) {
+func (m *MockDictionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]string, error) {
 	args := m.Called(ctx, prefix, language)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*Word), args.Error(1)
+	return args.Get(0).([]string), args.Error(1)
 }
 
 func TestNewService(t *testing.T) {
@@ -285,16 +285,13 @@ func TestAutoComplete(t *testing.T) {
 		{Text: "test2", Language: "en"},
 	}
 
-	apiWords := []*Word{
-		{Text: "test2", Language: "en"}, // Duplicate that should be deduplicated
-		{Text: "test3", Language: "en"},
-	}
+	apiSuggestions := []string{"test2", "test3"} // Duplicate that should be deduplicated
 
 	// Expect repository to find words by prefix
 	repo.On("FindByPrefix", ctx, "test", "en", 5).Return(localWords, nil)
 
 	// Expect dictionary API to fetch suggestions
-	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(apiWords, nil)
+	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(apiSuggestions, nil)
 
 	// Execute
 	results, err := svc.AutoComplete(ctx, "test", "en")
@@ -339,15 +336,13 @@ func TestAutoComplete_RepositoryError(t *testing.T) {
 	repoErr := errors.New("repository error")
 
 	// Create test data for API
-	apiWords := []*Word{
-		{Text: "test3", Language: "en"},
-	}
+	apiSuggestions := []string{"test3"}
 
 	// Expect repository to return an error
 	repo.On("FindByPrefix", ctx, "test", "en", 5).Return(nil, repoErr)
 
 	// API should still be called and succeed
-	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(apiWords, nil)
+	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(apiSuggestions, nil)
 
 	// Execute
 	results, err := svc.AutoComplete(ctx, "test", "en")
@@ -377,7 +372,7 @@ func TestAutoComplete_APIError(t *testing.T) {
 	repo.On("FindByPrefix", ctx, "test", "en", 5).Return(localWords, nil)
 
 	// API should fail
-	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return(nil, apiErr)
+	dictAPI.On("FetchSuggestions", ctx, "test", "en").Return([]string(nil), apiErr)
 
 	// Execute
 	results, err := svc.AutoComplete(ctx, "test", "en")
