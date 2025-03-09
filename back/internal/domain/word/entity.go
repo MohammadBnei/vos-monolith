@@ -1,7 +1,16 @@
 package word
 
 import (
+	"errors"
 	"time"
+	
+	"voconsteroid/internal/domain/word/languages/english"
+	"voconsteroid/internal/domain/word/languages/french"
+)
+
+var (
+	ErrInvalidWordType = errors.New("invalid word type")
+	ErrInvalidGender   = errors.New("invalid gender")
 )
 
 // Definition represents a single definition with its type and examples
@@ -10,8 +19,8 @@ type Definition struct {
 	WordType         string            `json:"word_type,omitempty"` // noun, verb, adjective, etc.
 	Examples         []string          `json:"examples,omitempty"`
 	Gender           string            `json:"gender,omitempty"`
-	Prononciation    string            `json:"prononciation,omitempty"`
-	LangageSpecifics map[string]string `json:"language_specifics,omitempty"`
+	Pronunciation    string            `json:"pronunciation,omitempty"`
+	LanguageSpecifics map[string]string `json:"language_specifics,omitempty"`
 	Notes            []string          `json:"notes,omitempty"`
 }
 
@@ -27,8 +36,6 @@ type Word struct {
 	Translations  map[string]string `json:"translations,omitempty"`
 	Synonyms      []string          `json:"synonyms,omitempty"`
 	Antonyms      []string          `json:"antonyms,omitempty"`
-	WordType      string            `json:"word_type,omitempty"`    // Primary word type if multiple exist
-	Gender        string            `json:"gender,omitempty"`       // Primary gender if multiple exist
 	SearchTerms   []string          `json:"search_terms,omitempty"` // All searchable forms of the word
 	Lemma         string            `json:"lemma,omitempty"`        // Base form of the word
 	UsageNotes    []string          `json:"usage_notes,omitempty"`  // General usage information
@@ -155,4 +162,53 @@ func (w *Word) SetPronunciation(format, value string) {
 	}
 	w.Pronunciation[format] = value
 	w.UpdatedAt = time.Now()
+}
+
+// ValidateDefinition validates a definition based on language rules
+func (w *Word) ValidateDefinition(def Definition) error {
+	switch w.Language {
+	case "fr":
+		if def.WordType != "" && !french.IsValidWordType(french.WordType(def.WordType)) {
+			return ErrInvalidWordType
+		}
+		if def.Gender != "" && !french.IsValidGender(french.Gender(def.Gender)) {
+			return ErrInvalidGender
+		}
+	case "en":
+		if def.WordType != "" && !english.IsValidWordType(english.WordType(def.WordType)) {
+			return ErrInvalidWordType
+		}
+		// English doesn't have grammatical gender
+	}
+	return nil
+}
+
+// GetPrimaryWordType returns the word type of the first definition
+func (w *Word) GetPrimaryWordType() string {
+	if len(w.Definitions) > 0 {
+		return w.Definitions[0].WordType
+	}
+	return ""
+}
+
+// GetAllSpecifics returns all specifics of the word from all definitions
+func (w *Word) GetAllSpecifics() []string {
+	specifics := make([]string, 0)
+	for _, def := range w.Definitions {
+		for _, val := range def.LanguageSpecifics {
+			specifics = append(specifics, val)
+		}
+	}
+	return specifics
+}
+
+// GetDefinitionsByType filters definitions by type
+func (w *Word) GetDefinitionsByType(wordType string) []Definition {
+	defs := make([]Definition, 0)
+	for _, def := range w.Definitions {
+		if def.WordType == wordType {
+			defs = append(defs, def)
+		}
+	}
+	return defs
 }
