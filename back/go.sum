@@ -16,6 +16,11 @@ github.com/PuerkitoBio/purell v1.1.1 h1:WEQqlqaGbrPkxLJWfBwQmfEAE1Z7ONdDLqrN38tN
 github.com/PuerkitoBio/purell v1.1.1/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 h1:d+Bc7a5rLufV/sSk/8dngufqelfh6jnri85riMAaF/M=
 github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578/go.mod h1:uGdkoq3SwY9Y+13GIhn11/XLaGBb4BfwItxLd5jeuXE=
+github.com/aaaton/golem/v4 v4.0.0/go.mod h1:OfK/S5v9Exsx1yO21WorREuIVV+Y5K2hygP0A9oJCCI=
+github.com/aaaton/golem/v4 v4.0.1 h1:jvnnTmzdfZC8cUGIo6obIcnmB3stTaf5Uw64OMx3C84=
+github.com/aaaton/golem/v4 v4.0.1/go.mod h1:OfK/S5v9Exsx1yO21WorREuIVV+Y5K2hygP0A9oJCCI=
+github.com/aaaton/golem/v4/dicts/fr v1.0.1 h1:PTcIwu5rOXDLdkrSX06hEwtYTj54KSZLzF3u6jFcPjE=
+github.com/aaaton/golem/v4/dicts/fr v1.0.1/go.mod h1:Ek2g4prUAsQfNGd6b+B9Ju3XOShrMWhkDqtVd629meM=
 github.com/andybalholm/cascadia v1.1.0/go.mod h1:GsXiBklL0woXo1j/WYWtSYYC4ouU9PqHO0sqidkEA4Y=
 github.com/andybalholm/cascadia v1.2.0 h1:vuRCkM5Ozh/BfmsaTm26kbjm0mIOM3yS5Ek/F5h18aE=
 github.com/andybalholm/cascadia v1.2.0/go.mod h1:YCyR8vOZT9aZ1CHEd8ap0gMVm2aFgxBp0T0eFw1RUQY=

@@ -3,6 +3,9 @@ module voconsteroid
 go 1.24
 
 require (
+	github.com/PuerkitoBio/goquery v1.5.1
+	github.com/aaaton/golem/v4 v4.0.1
+	github.com/aaaton/golem/v4/dicts/fr v1.0.1
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/gin-gonic/gin v1.10.0
 	github.com/gocolly/colly/v2 v2.1.0
@@ -22,7 +25,6 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/PuerkitoBio/goquery v1.5.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/andybalholm/cascadia v1.2.0 // indirect

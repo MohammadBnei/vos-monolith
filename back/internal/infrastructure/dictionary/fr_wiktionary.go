@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/aaaton/golem/v4"
+	"github.com/aaaton/golem/v4/dicts/fr"
 	"github.com/gocolly/colly/v2"
 	"github.com/rs/zerolog"
 
@@ -19,15 +21,19 @@ import (
 type FrenchWiktionaryAPI struct {
 	logger     zerolog.Logger
 	getBaseURL func(language string) string
+	lemmatizer *golem.Lemmatizer
 }
 
 // NewFrenchWiktionaryAPI creates a new French Wiktionary scraper
 func NewFrenchWiktionaryAPI(logger zerolog.Logger) *FrenchWiktionaryAPI {
+	lemmatizer, _ := golem.New(fr.New())
+
 	return &FrenchWiktionaryAPI{
 		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
 		getBaseURL: func(language string) string {
 			return "https://fr.wiktionary.org/wiki"
 		},
+		lemmatizer: lemmatizer,
 	}
 }
 
@@ -649,6 +655,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		newWord.Definitions[0].WordType = newWord.GetPrimaryWordType()
 	}
 
+	// Add lemma
+	if w.lemmatizer.InDict(text) {
+		newWord.Lemma = w.lemmatizer.Lemma(text)
+	}
+
 	w.logger.Debug().
 		Str("text", text).
 		Str("language", language).
@@ -656,6 +667,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		Int("synonyms", len(newWord.Synonyms)).
 		Int("antonyms", len(newWord.Antonyms)).
 		Str("etymology", newWord.Etymology).
+		Str("lemma", newWord.Lemma).
 		Msg("Successfully fetched word data from French Wiktionary")
 
 	return newWord, nil
