@@ -162,21 +162,22 @@ components:
         text:
           type: string
           description: The definition text
+          minLength: 1
         word_type:
           type: string
           description: Part of speech (noun, verb, adjective, etc.)
+          enum: [noun, verb, adjective, adverb, pronoun, preposition, conjunction, interjection]
         examples:
           type: array
           items:
             type: string
+            minLength: 1
           description: Examples specific to this definition
-        register:
-          type: string
-          description: Register information (formal, informal, slang, etc.)
         gender:
           type: string
           description: Grammatical gender
-        prononciation:
+          enum: [masculine, feminine, plural]
+        pronunciation:
           type: string
           description: Pronunciation specific to this definition
         language_specifics:
@@ -188,9 +189,11 @@ components:
           type: array
           items:
             type: string
+            minLength: 1
           description: Additional notes about this definition
       required:
         - text
+      additionalProperties: false
     
     Form:
       type: object
@@ -215,12 +218,15 @@ components:
         id:
           type: string
           description: Unique identifier for the word
+          format: uuid
         text:
           type: string
           description: The canonical form of the word
+          minLength: 1
         language:
           type: string
           description: Language code (e.g., en, fr, es)
+          enum: [fr, en]
         definitions:
           type: array
           items:
@@ -230,6 +236,7 @@ components:
           type: array
           items:
             type: string
+            minLength: 1
           description: General usage examples not tied to a specific definition
         pronunciation:
           type: object
@@ -248,18 +255,22 @@ components:
           type: array
           items:
             type: string
+            minLength: 1
           description: List of synonyms
         antonyms:
           type: array
           items:
             type: string
+            minLength: 1
           description: List of antonyms
         word_type:
           type: string
           description: Primary word type if multiple exist
+          enum: [noun, verb, adjective, adverb, pronoun, preposition, conjunction, interjection]
         gender:
           type: string
           description: Primary grammatical gender
+          enum: [masculine, feminine, plural]
         forms:
           type: array
           items:
@@ -269,26 +280,35 @@ components:
           type: array
           items:
             type: string
+            minLength: 1
           description: All searchable forms of the word
         lemma:
           type: string
           description: Base form of the word
+          minLength: 1
         usage_notes:
           type: array
           items:
             type: string
+            minLength: 1
           description: General usage information
         created_at:
           type: string
           format: date-time
           description: Creation timestamp
+          readOnly: true
         updated_at:
           type: string
           format: date-time
           description: Last update timestamp
+          readOnly: true
       required:
         - text
         - language
+        - search_terms
+        - created_at
+        - updated_at
+      additionalProperties: false
     WordSearchRequest:
       type: object
       properties:
