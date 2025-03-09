@@ -256,7 +256,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				if pageStructure.HasFrenchSection && heading.Name == "h3" {
 					switch {
 					case strings.Contains(headingText, "Nom") ||
-						strings.Contains(headingText, "Verbe") ||
+						strings.EqualFold(headingText, "Verbe") ||
 						strings.Contains(headingText, "Adjectif") ||
 						strings.Contains(headingText, "Adverbe"):
 						pageStructure.WordTypeSections[headingText] = headingID
@@ -264,9 +264,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						pageStructure.OtherSections["etymology"] = headingID
 					case strings.Contains(headingText, "Prononciation"):
 						pageStructure.OtherSections["pronunciation"] = headingID
-					default:
-						// Other sections
-						pageStructure.OtherSections[headingText] = headingID
 					}
 
 					w.logger.Debug().Str("title", headingText).Str("id", headingID).Msg("Found section directly")
@@ -415,7 +412,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				nextElem := sectionHeading.Parent().Next()
 
 				// Try to find the definition list (could be directly after the heading or after a paragraph)
-				for i := 0; i < 10 && nextElem.Length() > 0; i++ {
+				for i := 0; !nextElem.HasClass("mw-heading") && nextElem.Length() > 0; i++ {
 					switch {
 					case nextElem.Is("p"):
 						nextElem.Children().Each(func(_ int, child *goquery.Selection) {
@@ -429,13 +426,22 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					case nextElem.Is("table"):
 						nextElem.Find("tr").Each(func(i int, trSelection *goquery.Selection) {
 							if i > 0 {
-								trSelection.Find("th").Each(func(j int, tdSelection *goquery.Selection) {
-									// Found masculin or feminin
-									switch tdSelection.Text() {
+								trSelection.Children().Each(func(j int, child *goquery.Selection) {
+									text := strings.TrimSpace(child.Text())
+									if text == "" {
+										return
+									}
+
+									if j > 0 && foundDefinition.LangageSpecifics["plural"] == "" {
+										foundDefinition.LangageSpecifics["plural"] = child.Children().First().Text()
+									}
+
+									// masculin or feminin
+									switch text {
 									case "Féminin":
-										foundDefinition.LangageSpecifics["feminin"] = tdSelection.Next().Text()
+										foundDefinition.LangageSpecifics["féminin"] = child.Next().Children().First().Text()
 									case "Masculin":
-										foundDefinition.LangageSpecifics["masculin"] = tdSelection.Next().Text()
+										foundDefinition.LangageSpecifics["masculin"] = child.Next().Children().First().Text()
 									}
 								})
 							}
@@ -503,8 +509,9 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						foundDefinition.Text = definitionText
 						foundDefinition.Examples = examples
 
+						newWord.AddDefinition(foundDefinition)
+
 						// Add the definition using the entity method
-						newWord.Definitions = append(newWord.Definitions, foundDefinition)
 						w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
 					})
 				}

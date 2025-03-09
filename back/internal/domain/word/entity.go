@@ -125,19 +125,34 @@ func (w *Word) SetLemma(lemma string) {
 }
 
 // AddDefinition adds a new definition to the word
-func (w *Word) AddDefinition(text, wordType string, examples []string) {
-	w.Definitions = append(w.Definitions, Definition{
-		Text:     text,
-		WordType: wordType,
-		Examples: examples,
-	})
+func (w *Word) AddDefinition(definition Definition) {
+	w.Definitions = append(w.Definitions, definition)
 
 	// Update the primary word type if not set
-	if w.WordType == "" && wordType != "" {
-		w.WordType = wordType
+	if w.WordType == "" && definition.WordType != "" {
+		w.WordType = definition.WordType
+	}
+
+	// Update the search terms
+	for _, term := range definition.LangageSpecifics {
+		w.AddSearchTerm(term)
 	}
 
 	// Update the UpdatedAt timestamp
+	w.UpdatedAt = time.Now()
+}
+
+// AddSearchTerm adds a new search term to the word's search terms.
+// It is used to make the word searchable by a particular term.
+func (w *Word) AddSearchTerm(term string) {
+	// Check if already exists
+	for _, s := range w.SearchTerms {
+		if s == term {
+			return
+		}
+	}
+
+	w.SearchTerms = append(w.SearchTerms, term)
 	w.UpdatedAt = time.Now()
 }
 
