@@ -119,8 +119,14 @@ func (w *FrenchWiktionaryAPI) FetchRelatedWords(ctx context.Context, word *wordD
 func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*wordDomain.Word, error) {
 	w.logger.Debug().Str("text", text).Str("language", language).Msg("Fetching word from French Wiktionary")
 
-	// Create a new word
+	// Create a new word with validation
 	newWord := wordDomain.NewWord(text, language)
+	
+	// Validate language
+	if language != "fr" {
+		w.logger.Warn().Str("language", language).Msg("Unsupported language for French Wiktionary")
+		return nil, fmt.Errorf("unsupported language %s: %w", language, wordDomain.ErrWordNotFound)
+	}
 
 	// Create a single collector for the entire operation
 	c := colly.NewCollector(
@@ -284,7 +290,10 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		wordType := strings.TrimSpace(e.Text)
 		if strings.Contains(wordType, "masculin") || strings.Contains(wordType, "féminin") {
 			w.logger.Debug().Str("wordType", wordType).Msg("Found word type")
-			newWord.Gender = wordType
+			// Gender is now stored in definitions, not at word level
+			if len(newWord.Definitions) > 0 {
+				newWord.Definitions[len(newWord.Definitions)-1].Gender = wordType
+			}
 
 			// If this is a form of another word, try to extract the lemma
 			if strings.Contains(wordType, "de ") {
@@ -477,10 +486,22 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 							}
 						})
 
-						foundDefinition.Text = definitionText
-						foundDefinition.Examples = examples
+						// Create new definition with validation
+						newDef := wordDomain.NewDefinition()
+						newDef.Text = definitionText
+						newDef.Examples = examples
+						newDef.WordType = foundDefinition.WordType
+						newDef.Gender = foundDefinition.Gender
+						newDef.Pronunciation = foundDefinition.Prononciation
+						newDef.LanguageSpecifics = foundDefinition.LanguageSpecifics
 
-						newWord.AddDefinition(foundDefinition)
+						// Validate before adding
+						if err := newWord.ValidateDefinition(newDef); err != nil {
+							w.logger.Warn().Err(err).Str("wordType", newDef.WordType).Str("gender", newDef.Gender).Msg("Skipping invalid definition")
+							continue
+						}
+
+						newWord.AddDefinition(newDef)
 
 						// Add the definition using the entity method
 						w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
@@ -717,6 +738,11 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	if len(newWord.Definitions) == 0 {
 		w.logger.Warn().Str("text", text).Str("language", language).Msg("No word data found")
 		return nil, fmt.Errorf("no word data found: %w", wordDomain.ErrWordNotFound)
+	}
+
+	// Set primary word type from first definition
+	if len(newWord.Definitions) > 0 {
+		newWord.Definitions[0].WordType = newWord.GetPrimaryWordType()
 	}
 
 	w.logger.Debug().
