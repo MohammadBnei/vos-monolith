@@ -3,7 +3,7 @@ package word
 import (
 	"errors"
 	"time"
-	
+
 	"voconsteroid/internal/domain/word/languages/english"
 	"voconsteroid/internal/domain/word/languages/french"
 )
@@ -15,13 +15,13 @@ var (
 
 // Definition represents a single definition with its type and examples
 type Definition struct {
-	Text             string            `json:"text"`
-	WordType         string            `json:"word_type,omitempty"` // noun, verb, adjective, etc.
-	Examples         []string          `json:"examples,omitempty"`
-	Gender           string            `json:"gender,omitempty"`
-	Pronunciation    string            `json:"pronunciation,omitempty"`
+	Text              string            `json:"text"`
+	WordType          string            `json:"word_type,omitempty"` // noun, verb, adjective, etc.
+	Examples          []string          `json:"examples,omitempty"`
+	Gender            string            `json:"gender,omitempty"`
+	Pronunciation     string            `json:"pronunciation,omitempty"`
 	LanguageSpecifics map[string]string `json:"language_specifics,omitempty"`
-	Notes            []string          `json:"notes,omitempty"`
+	Notes             []string          `json:"notes,omitempty"`
 }
 
 // Word represents a vocabulary word with its definitions and metadata
@@ -65,9 +65,9 @@ func NewWord(text, language string) *Word {
 // NewDefinition returns a new, empty Definition structure.
 func NewDefinition() Definition {
 	return Definition{
-		Examples:         []string{},
-		LangageSpecifics: make(map[string]string),
-		Notes:            []string{},
+		Examples:          []string{},
+		LanguageSpecifics: make(map[string]string),
+		Notes:             []string{},
 	}
 }
 
@@ -95,13 +95,8 @@ func (w *Word) SetLemma(lemma string) {
 func (w *Word) AddDefinition(definition Definition) {
 	w.Definitions = append(w.Definitions, definition)
 
-	// Update the primary word type if not set
-	if w.WordType == "" && definition.WordType != "" {
-		w.WordType = definition.WordType
-	}
-
 	// Update the search terms
-	for _, term := range definition.LangageSpecifics {
+	for _, term := range definition.LanguageSpecifics {
 		w.AddSearchTerm(term)
 	}
 

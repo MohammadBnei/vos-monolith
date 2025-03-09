@@ -121,7 +121,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 	// Create a new word with validation
 	newWord := wordDomain.NewWord(text, language)
-	
+
 	// Validate language
 	if language != "fr" {
 		w.logger.Warn().Str("language", language).Msg("Unsupported language for French Wiktionary")
@@ -397,7 +397,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					case nextElem.Is("p"):
 						nextElem.Children().Each(func(_ int, child *goquery.Selection) {
 							if titleAttr, _ := child.Attr("title"); child.Is("a") && strings.Contains(titleAttr, "Prononciation") {
-								foundDefinition.Prononciation = child.Text()
+								foundDefinition.Pronunciation = child.Text()
 							}
 							if child.Is("span.ligne-de-forme") {
 								foundDefinition.Gender = child.Text()
@@ -492,13 +492,13 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						newDef.Examples = examples
 						newDef.WordType = foundDefinition.WordType
 						newDef.Gender = foundDefinition.Gender
-						newDef.Pronunciation = foundDefinition.Prononciation
+						newDef.Pronunciation = foundDefinition.Pronunciation
 						newDef.LanguageSpecifics = foundDefinition.LanguageSpecifics
 
 						// Validate before adding
 						if err := newWord.ValidateDefinition(newDef); err != nil {
 							w.logger.Warn().Err(err).Str("wordType", newDef.WordType).Str("gender", newDef.Gender).Msg("Skipping invalid definition")
-							continue
+							return
 						}
 
 						newWord.AddDefinition(newDef)
