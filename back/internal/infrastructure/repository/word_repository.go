@@ -136,9 +136,9 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 			definitions = $3,
 			etymology = $4,
 			translations = $5,
-			word_type = $6,
-			search_terms = $7,
-			lemma = $8,
+			search_terms = $6,
+			lemma = $7,
+			created_at = $8,
 			updated_at = $9
 		RETURNING id
 	`

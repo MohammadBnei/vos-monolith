@@ -40,7 +40,7 @@ func TestWordRepository_ErrorHandling(t *testing.T) {
 
 	// Test database error handling
 	mock.ExpectQuery(`SELECT id, text, language, definitions, etymology, translations, 
-		       word_type, search_terms, lemma, created_at, updated_at
+		       search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE text = \$1 AND language = \$2`).
 		WithArgs("error-test", "en").
@@ -55,7 +55,7 @@ func TestWordRepository_ErrorHandling(t *testing.T) {
 
 	// Test with a different error
 	mock.ExpectQuery(`SELECT id, text, language, definitions, etymology, translations, 
-		       word_type, search_terms, lemma, created_at, updated_at
+		       search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE text = \$1 AND language = \$2`).
 		WithArgs("db-error", "en").
