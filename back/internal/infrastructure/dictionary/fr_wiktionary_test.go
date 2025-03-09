@@ -57,6 +57,11 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 			assert.True(t, french.IsValidGender(french.Gender(def.Gender)),
 				"Gender should be valid for French")
 		}
+
+		// Check for notes in definition
+		if len(def.Notes) > 0 {
+			assert.NotEmpty(t, def.Notes[0], "Note should not be empty")
+		}
 	}
 
 	// Check that we have synonyms
@@ -69,6 +74,19 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 	assert.NotEmpty(t, word.SearchTerms, "SearchTerms should be populated")
 	assert.Contains(t, word.SearchTerms, "maison", "Main word should be in search terms")
 	assert.NotEmpty(t, word.Lemma, "Lemma should be set")
+
+	// Check translations if available
+	if len(word.Translations) > 0 {
+		for lang, translation := range word.Translations {
+			assert.NotEmpty(t, lang, "Translation language should not be empty")
+			assert.NotEmpty(t, translation, "Translation text should not be empty")
+		}
+	}
+
+	// Check antonyms if available
+	if len(word.Antonyms) > 0 {
+		assert.NotEmpty(t, word.Antonyms[0], "Antonym should not be empty")
+	}
 
 	// Check that the timestamps are set
 	assert.False(t, word.CreatedAt.IsZero(), "CreatedAt should be set")
@@ -178,6 +196,28 @@ func TestFrenchWiktionaryAPI_RealFetchWord(t *testing.T) {
 	// Check that we have an etymology
 	assert.NotEmpty(t, word.Etymology, "Should have etymology")
 
+	// Check search terms
+	assert.NotEmpty(t, word.SearchTerms, "SearchTerms should be populated")
+	assert.Contains(t, word.SearchTerms, "maison", "Main word should be in search terms")
+
+	// Check lemma if available
+	if word.Lemma != "" {
+		assert.NotEmpty(t, word.Lemma, "Lemma should not be empty if set")
+	}
+
+	// Check translations if available
+	if len(word.Translations) > 0 {
+		for lang, translation := range word.Translations {
+			assert.NotEmpty(t, lang, "Translation language should not be empty")
+			assert.NotEmpty(t, translation, "Translation text should not be empty")
+		}
+	}
+
+	// Check antonyms if available
+	if len(word.Antonyms) > 0 {
+		assert.NotEmpty(t, word.Antonyms[0], "Antonym should not be empty")
+	}
+
 	// Check that the timestamps are set
 	assert.False(t, word.CreatedAt.IsZero(), "CreatedAt should be set")
 	assert.False(t, word.UpdatedAt.IsZero(), "UpdatedAt should be set")
@@ -269,4 +309,106 @@ func containsString(slice []string, str string) bool {
 		}
 	}
 	return false
+}
+
+// TestWord_EntityMethods tests the methods of the Word entity
+func TestWord_EntityMethods(t *testing.T) {
+	// Create a new word
+	word := wordDomain.NewWord("test", "fr")
+	
+	// Test SetLemma
+	word.SetLemma("tester")
+	assert.Equal(t, "tester", word.Lemma)
+	assert.Contains(t, word.SearchTerms, "tester")
+	
+	// Test AddDefinition
+	def := wordDomain.NewDefinition()
+	def.Text = "A test definition"
+	def.WordType = "noun"
+	def.Examples = []string{"This is a test example"}
+	def.Gender = "masculine"
+	def.Pronunciation = "/tɛst/"
+	def.LanguageSpecifics = map[string]string{"plural": "tests"}
+	def.Notes = []string{"This is a test note"}
+	
+	word.AddDefinition(def)
+	assert.Len(t, word.Definitions, 1)
+	assert.Equal(t, "A test definition", word.Definitions[0].Text)
+	assert.Contains(t, word.SearchTerms, "tests")
+	
+	// Test AddSearchTerm
+	word.AddSearchTerm("testing")
+	assert.Contains(t, word.SearchTerms, "testing")
+	
+	// Test adding duplicate search term
+	word.AddSearchTerm("testing")
+	count := 0
+	for _, term := range word.SearchTerms {
+		if term == "testing" {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "Duplicate search term should not be added")
+	
+	// Test AddSynonym
+	word.AddSynonym("examination")
+	assert.Contains(t, word.Synonyms, "examination")
+	
+	// Test adding duplicate synonym
+	word.AddSynonym("examination")
+	count = 0
+	for _, syn := range word.Synonyms {
+		if syn == "examination" {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "Duplicate synonym should not be added")
+	
+	// Test AddAntonym
+	word.AddAntonym("ignorance")
+	assert.Contains(t, word.Antonyms, "ignorance")
+	
+	// Test adding duplicate antonym
+	word.AddAntonym("ignorance")
+	count = 0
+	for _, ant := range word.Antonyms {
+		if ant == "ignorance" {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "Duplicate antonym should not be added")
+	
+	// Test GetPrimaryWordType
+	assert.Equal(t, "noun", word.GetPrimaryWordType())
+	
+	// Test GetAllSpecifics
+	specifics := word.GetAllSpecifics()
+	assert.Contains(t, specifics, "tests")
+	
+	// Test GetDefinitionsByType
+	nounDefs := word.GetDefinitionsByType("noun")
+	assert.Len(t, nounDefs, 1)
+	assert.Equal(t, "A test definition", nounDefs[0].Text)
+	
+	verbDefs := word.GetDefinitionsByType("verb")
+	assert.Len(t, verbDefs, 0)
+	
+	// Test ValidateDefinition
+	validDef := wordDomain.NewDefinition()
+	validDef.WordType = "noun"
+	validDef.Gender = "masculine"
+	err := word.ValidateDefinition(validDef)
+	assert.NoError(t, err)
+	
+	invalidTypeDef := wordDomain.NewDefinition()
+	invalidTypeDef.WordType = "invalid_type"
+	err = word.ValidateDefinition(invalidTypeDef)
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, wordDomain.ErrInvalidWordType)
+	
+	invalidGenderDef := wordDomain.NewDefinition()
+	invalidGenderDef.Gender = "invalid_gender"
+	err = word.ValidateDefinition(invalidGenderDef)
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, wordDomain.ErrInvalidGender)
 }
