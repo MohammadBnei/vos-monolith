@@ -285,30 +285,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		}
 	})
 
-	// Extract gender information
-	c.OnHTML("p span.ligne-de-forme", func(e *colly.HTMLElement) {
-		wordType := strings.TrimSpace(e.Text)
-		if strings.Contains(wordType, "masculin") || strings.Contains(wordType, "féminin") {
-			w.logger.Debug().Str("wordType", wordType).Msg("Found word type")
-			// Gender is now stored in definitions, not at word level
-			if len(newWord.Definitions) > 0 {
-				newWord.Definitions[len(newWord.Definitions)-1].Gender = wordType
-			}
-
-			// If this is a form of another word, try to extract the lemma
-			if strings.Contains(wordType, "de ") {
-				parts := strings.Split(wordType, "de ")
-				if len(parts) > 1 {
-					lemma := strings.TrimSpace(parts[1])
-					if lemma != "" && lemma != newWord.Text {
-						w.logger.Debug().Str("lemma", lemma).Msg("Found lemma")
-						newWord.SetLemma(lemma)
-					}
-				}
-			}
-		}
-	})
-
 	c.OnScraped(func(r *colly.Response) {
 		// Extract etymology if section exists
 		if etymologyID, ok := pageStructure.OtherSections["etymology"]; ok {
@@ -469,22 +445,10 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 							}
 						})
 
-						// Create new definition with validation
-						newDef := wordDomain.NewDefinition()
-						newDef.Text = definitionText
-						newDef.Examples = examples
-						newDef.WordType = foundDefinition.WordType
-						newDef.Gender = foundDefinition.Gender
-						newDef.Pronunciation = foundDefinition.Pronunciation
-						newDef.LanguageSpecifics = foundDefinition.LanguageSpecifics
+						foundDefinition.Text = definitionText
+						foundDefinition.Examples = examples
 
-						// Validate before adding
-						if err := newWord.ValidateDefinition(newDef); err != nil {
-							w.logger.Warn().Err(err).Str("wordType", newDef.WordType).Str("gender", newDef.Gender).Msg("Skipping invalid definition")
-							return
-						}
-
-						newWord.AddDefinition(newDef)
+						newWord.AddDefinition(foundDefinition)
 
 						// Add the definition using the entity method
 						w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
@@ -643,49 +607,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 						}
 					})
 				}
-			}
-		}
-
-		// Fallback for definitions if none were found
-		if len(newWord.Definitions) == 0 {
-			w.logger.Warn().Msg("No definitions found with primary selectors, trying fallback")
-
-			// Try to find any ordered list in the French section
-			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(r.Body))
-			if err != nil {
-				w.logger.Error().Err(err).Msg("Failed to parse HTML for fallback definitions")
-				return
-			}
-
-			doc.Find("ol li").Each(func(_ int, li *goquery.Selection) {
-				if len(newWord.Definitions) == 0 {
-					definitionText := strings.TrimSpace(li.Text())
-					if definitionText != "" && len(definitionText) > 10 {
-						w.logger.Debug().Str("definition", definitionText).Msg("Found definition with fallback method")
-						newWord.Definitions = append(newWord.Definitions, wordDomain.Definition{
-							Text:     definitionText,
-							WordType: "",
-							Examples: []string{},
-						})
-					}
-				}
-			})
-
-			// If still no definitions, try paragraphs
-			if len(newWord.Definitions) == 0 {
-				doc.Find("p").Each(func(_ int, p *goquery.Selection) {
-					if len(newWord.Definitions) == 0 {
-						fullText := strings.TrimSpace(p.Text())
-						if fullText != "" && len(fullText) > 10 && !strings.HasPrefix(fullText, "From") {
-							w.logger.Debug().Str("definition", fullText).Msg("Found definition in paragraph with fallback method")
-							newWord.Definitions = append(newWord.Definitions, wordDomain.Definition{
-								Text:     fullText,
-								WordType: "",
-								Examples: []string{},
-							})
-						}
-					}
-				})
 			}
 		}
 	})
