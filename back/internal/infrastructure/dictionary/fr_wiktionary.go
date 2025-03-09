@@ -3,7 +3,10 @@ package dictionary
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -121,7 +124,7 @@ func (w *FrenchWiktionaryAPI) FetchRelatedWords(ctx context.Context, word *wordD
 	return relatedWords, nil
 }
 
-func (w *FrenchWiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]string, error) {
+func (w *FrenchWiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]*wordDomain.Word, error) {
 	w.logger.Debug().Str("prefix", prefix).Str("language", language).Msg("Fetching suggestions from French Wiktionary")
 
 	// Validate language
@@ -130,28 +133,64 @@ func (w *FrenchWiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, lang
 		return nil, fmt.Errorf("unsupported language %s", language)
 	}
 
-	// Create a collector for the suggestion page
-	c := colly.NewCollector(
-		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
-		colly.MaxDepth(1),
-	)
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
 
-	// Set timeout
-	c.SetRequestTimeout(5 * time.Second)
-
-	// Store suggestions
-	suggestions := []string{}
-
-	// TODO: Implement the actual scraping logic
-	// This is a placeholder for you to implement the scraping logic
-	// You'll need to:
-	// 1. Visit the Wiktionary search page with the prefix
-	// 2. Extract the suggestion results
-	// 3. Create lightweight Word objects for each suggestion
-
-	// Example URL to visit: https://fr.wiktionary.org/w/index.php?title=Sp%C3%A9cial:Recherche&profile=default&fulltext=0&search=prefix
-
-	// Return the empty suggestions for now
+	// URL encode the prefix
+	encodedPrefix := url.QueryEscape(prefix)
+	
+	// Build the API URL
+	apiURL := fmt.Sprintf("https://fr.wiktionary.org/w/rest.php/v1/search/title?q=%s&limit=10", encodedPrefix)
+	
+	// Create request
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	if err != nil {
+		w.logger.Error().Err(err).Str("url", apiURL).Msg("Failed to create request")
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	// Set user agent
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	
+	// Execute request
+	resp, err := client.Do(req)
+	if err != nil {
+		w.logger.Error().Err(err).Str("url", apiURL).Msg("Failed to execute request")
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	// Check status code
+	if resp.StatusCode != http.StatusOK {
+		w.logger.Error().Int("status", resp.StatusCode).Str("url", apiURL).Msg("Received non-OK status code")
+		return nil, fmt.Errorf("received non-OK status code: %d", resp.StatusCode)
+	}
+	
+	// Parse response
+	var searchResponse struct {
+		Pages []struct {
+			ID      int    `json:"id"`
+			Key     string `json:"key"`
+			Title   string `json:"title"`
+			Excerpt string `json:"excerpt"`
+		} `json:"pages"`
+	}
+	
+	if err := json.NewDecoder(resp.Body).Decode(&searchResponse); err != nil {
+		w.logger.Error().Err(err).Str("url", apiURL).Msg("Failed to decode response")
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	
+	// Convert to Word objects
+	suggestions := make([]*wordDomain.Word, 0, len(searchResponse.Pages))
+	for _, page := range searchResponse.Pages {
+		word := wordDomain.NewWord(page.Title, language)
+		suggestions = append(suggestions, word)
+	}
+	
+	w.logger.Debug().Int("count", len(suggestions)).Msg("Found suggestions")
 	return suggestions, nil
 }
 
