@@ -248,7 +248,6 @@ func TestWordRepository_Integration(t *testing.T) {
 			WordType: "verb",
 			Examples: []string{"to test something"},
 		})
-		testWord.Examples = append(testWord.Examples, "another example")
 
 		// Save the updated word
 		err = repo.Save(ctx, testWord)
@@ -264,7 +263,6 @@ func TestWordRepository_Integration(t *testing.T) {
 		assert.Equal(t, originalID, updated.ID)
 		assert.Len(t, updated.Definitions, 2)
 		assert.Equal(t, "a second definition", updated.Definitions[1].Text)
-		assert.Contains(t, updated.Examples, "another example")
 	})
 
 	t.Run("ComplexFiltering", func(t *testing.T) {

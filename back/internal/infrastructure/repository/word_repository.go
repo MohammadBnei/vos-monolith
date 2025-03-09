@@ -159,7 +159,6 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 		w.Text,
 		w.Language,
 		definitionsJSON,
-		w.Pronunciation,
 		w.Etymology,
 		w.Translations,
 		w.SearchTerms,
