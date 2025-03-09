@@ -58,6 +58,14 @@ func (m *MockDictionaryAPI) FetchWord(ctx context.Context, text, language string
 	return args.Get(0).(*Word), args.Error(1)
 }
 
+func (m *MockDictionaryAPI) FetchRelatedWords(ctx context.Context, word *Word) (*RelatedWords, error) {
+	args := m.Called(ctx, word)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*RelatedWords), args.Error(1)
+}
+
 func TestNewService(t *testing.T) {
 	// Setup
 	repo := new(MockRepository)

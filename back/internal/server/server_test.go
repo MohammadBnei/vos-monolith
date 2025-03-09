@@ -49,6 +49,14 @@ func (m *MockWordService) Search(ctx context.Context, text, language string) (*w
 	return args.Get(0).(*word.Word), args.Error(1)
 }
 
+func (m *MockWordService) GetRelatedWords(ctx context.Context, wordID string) (*word.RelatedWords, error) {
+	args := m.Called(ctx, wordID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*word.RelatedWords), args.Error(1)
+}
+
 func (m *MockWordService) GetRecentWords(ctx context.Context, language string, limit int) ([]*word.Word, error) {
 	args := m.Called(ctx, language, limit)
 	if args.Get(0) == nil {
