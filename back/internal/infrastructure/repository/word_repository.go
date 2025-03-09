@@ -37,13 +37,13 @@ func NewWordRepository(db DBInterface, logger zerolog.Logger) *WordRepository {
 func (r *WordRepository) FindByText(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
-		       word_type, forms, search_terms, lemma, created_at, updated_at
+		       word_type, search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE text = $1 AND language = $2
 	`
 
 	var w word.Word
-	var definitionsJSON, wordFormsJSON []byte
+	var definitionsJSON []byte
 	var examples, searchTerms []string
 	var translations map[string]string
 
@@ -57,7 +57,6 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 		&w.Etymology,
 		&translations,
 		&w.WordType,
-		&wordFormsJSON,
 		&searchTerms,
 		&w.Lemma,
 		&w.CreatedAt,
@@ -76,11 +75,6 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 		return nil, fmt.Errorf("failed to parse definitions: %w", err)
 	}
 
-	// Parse word forms JSON
-	if err := json.Unmarshal(wordFormsJSON, &w.Forms); err != nil {
-		return nil, fmt.Errorf("failed to parse word forms: %w", err)
-	}
-
 	w.Examples = examples
 	w.SearchTerms = searchTerms
 	w.Translations = translations
@@ -92,13 +86,13 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
-		       word_type, forms, search_terms, lemma, created_at, updated_at
+		       word_type, search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE language = $1 AND $2 = ANY(search_terms)
 	`
 
 	var w word.Word
-	var definitionsJSON, wordFormsJSON []byte
+	var definitionsJSON []byte
 	var examples, searchTerms []string
 	var translations map[string]string
 
@@ -112,7 +106,6 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 		&w.Etymology,
 		&translations,
 		&w.WordType,
-		&wordFormsJSON,
 		&searchTerms,
 		&w.Lemma,
 		&w.CreatedAt,
@@ -129,11 +122,6 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 	// Parse definitions JSON
 	if err := json.Unmarshal(definitionsJSON, &w.Definitions); err != nil {
 		return nil, fmt.Errorf("failed to parse definitions: %w", err)
-	}
-
-	// Parse word forms JSON
-	if err := json.Unmarshal(wordFormsJSON, &w.Forms); err != nil {
-		return nil, fmt.Errorf("failed to parse word forms: %w", err)
 	}
 
 	w.Examples = examples
@@ -178,12 +166,6 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 		return fmt.Errorf("failed to marshal definitions: %w", err)
 	}
 
-	// Convert word forms to JSON
-	wordFormsJSON, err := json.Marshal(w.Forms)
-	if err != nil {
-		return fmt.Errorf("failed to marshal word forms: %w", err)
-	}
-
 	return r.db.QueryRow(ctx, query,
 		w.Text,
 		w.Language,
@@ -193,7 +175,6 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 		w.Etymology,
 		w.Translations,
 		w.WordType,
-		wordFormsJSON,
 		w.SearchTerms,
 		w.Lemma,
 		w.CreatedAt,
@@ -270,11 +251,6 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 		// Parse definitions JSON
 		if err := json.Unmarshal(definitionsJSON, &w.Definitions); err != nil {
 			return nil, fmt.Errorf("failed to parse definitions: %w", err)
-		}
-
-		// Parse word forms JSON
-		if err := json.Unmarshal(wordFormsJSON, &w.Forms); err != nil {
-			return nil, fmt.Errorf("failed to parse word forms: %w", err)
 		}
 
 		w.Examples = examples

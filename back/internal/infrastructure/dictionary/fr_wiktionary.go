@@ -131,13 +131,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	// Set timeout
 	c.SetRequestTimeout(10 * time.Second)
 
-	// Add rate limiting to avoid being blocked
-	c.Limit(&colly.LimitRule{
-		DomainGlob:  "*.wiktionary.org",
-		Delay:       1 * time.Second,
-		RandomDelay: 500 * time.Millisecond,
-	})
-
 	// Initialize page structure
 	pageStructure := &PageStructure{
 		SectionIDs:       make(map[string]string),
@@ -284,28 +277,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 				}
 			})
 		}
-	})
-
-	// Extract word forms
-	c.OnHTML("table.flextable-fr-mfsp", func(e *colly.HTMLElement) {
-		w.logger.Debug().Msg("Found flextable with word information")
-
-		// Extract plural form
-		e.ForEach("tr", func(_ int, tr *colly.HTMLElement) {
-			if strings.Contains(tr.Text, "Pluriel") {
-				tr.ForEach("td", func(_ int, td *colly.HTMLElement) {
-					plural := strings.TrimSpace(td.Text)
-					if plural != "" && plural != newWord.Text {
-						w.logger.Debug().Str("plural", plural).Msg("Found plural form")
-						newWord.Translations["plural"] = plural
-
-						// Add this as a word form
-						pluralAttributes := map[string]string{"number": "plural"}
-						newWord.AddWordForm(plural, pluralAttributes, false)
-					}
-				})
-			}
-		})
 	})
 
 	// Extract gender information
@@ -728,7 +699,8 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		err := c.Visit(url)
 		if err != nil {
 			w.logger.Error().Err(err).Str("url", url).Msg("Failed to visit page")
-			return nil, fmt.Errorf("failed to visit page: %w", err)
+
+			return nil, fmt.Errorf("failed to visit page: %w, %w", err, wordDomain.ErrWordNotFound)
 		}
 	}
 

@@ -4,19 +4,11 @@ import (
 	"time"
 )
 
-// Form represents a different form of a word with its attributes
-type Form struct {
-	Text       string            `json:"text"`
-	Attributes map[string]string `json:"attributes,omitempty"` // e.g. {"number": "plural", "tense": "past"}
-	IsLemma    bool              `json:"is_lemma,omitempty"`   // Whether this form is the lemma/base form
-}
-
 // Definition represents a single definition with its type and examples
 type Definition struct {
 	Text             string            `json:"text"`
 	WordType         string            `json:"word_type,omitempty"` // noun, verb, adjective, etc.
 	Examples         []string          `json:"examples,omitempty"`
-	Register         string            `json:"register,omitempty"` // formal, informal, slang, etc.
 	Gender           string            `json:"gender,omitempty"`
 	Prononciation    string            `json:"prononciation,omitempty"`
 	LangageSpecifics map[string]string `json:"language_specifics,omitempty"`
@@ -35,9 +27,8 @@ type Word struct {
 	Translations  map[string]string `json:"translations,omitempty"`
 	Synonyms      []string          `json:"synonyms,omitempty"`
 	Antonyms      []string          `json:"antonyms,omitempty"`
-	WordType      string            `json:"word_type,omitempty"` // Primary word type if multiple exist
-	Gender        string            `json:"gender,omitempty"`    // Primary gender if multiple exist
-	Forms         []Form            `json:"forms,omitempty"`
+	WordType      string            `json:"word_type,omitempty"`    // Primary word type if multiple exist
+	Gender        string            `json:"gender,omitempty"`       // Primary gender if multiple exist
 	SearchTerms   []string          `json:"search_terms,omitempty"` // All searchable forms of the word
 	Lemma         string            `json:"lemma,omitempty"`        // Base form of the word
 	UsageNotes    []string          `json:"usage_notes,omitempty"`  // General usage information
@@ -57,7 +48,6 @@ func NewWord(text, language string) *Word {
 		Synonyms:      []string{},
 		Antonyms:      []string{},
 		Translations:  make(map[string]string),
-		Forms:         []Form{},
 		SearchTerms:   []string{text}, // Initialize with the main text as a search term
 		UsageNotes:    []string{},
 		CreatedAt:     now,
@@ -72,36 +62,6 @@ func NewDefinition() Definition {
 		LangageSpecifics: make(map[string]string),
 		Notes:            []string{},
 	}
-}
-
-// AddWordForm adds a new form of the word and updates search terms
-func (w *Word) AddWordForm(text string, attributes map[string]string, isLemma bool) {
-	// Add the form to WordForms
-	w.Forms = append(w.Forms, Form{
-		Text:       text,
-		Attributes: attributes,
-		IsLemma:    isLemma,
-	})
-
-	// Add to search terms if not already present
-	found := false
-	for _, term := range w.SearchTerms {
-		if term == text {
-			found = true
-			break
-		}
-	}
-	if !found {
-		w.SearchTerms = append(w.SearchTerms, text)
-	}
-
-	// Update lemma if this form is marked as lemma
-	if isLemma {
-		w.Lemma = text
-	}
-
-	// Update the UpdatedAt timestamp
-	w.UpdatedAt = time.Now()
 }
 
 // SetLemma sets the lemma (base form) of the word
