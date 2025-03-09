@@ -30,8 +30,6 @@ type Word struct {
 	Text          string            `json:"text"` // The canonical form
 	Language      string            `json:"language"`
 	Definitions   []Definition      `json:"definitions,omitempty"`
-	Examples      []string          `json:"examples,omitempty"`      // General examples not tied to a specific definition
-	Pronunciation map[string]string `json:"pronunciation,omitempty"` // Different pronunciation formats (IPA, audio URL, etc.)
 	Etymology     string            `json:"etymology,omitempty"`
 	Translations  map[string]string `json:"translations,omitempty"`
 	Synonyms      []string          `json:"synonyms,omitempty"`
@@ -50,8 +48,6 @@ func NewWord(text, language string) *Word {
 		Text:          text,
 		Language:      language,
 		Definitions:   []Definition{},
-		Examples:      []string{},
-		Pronunciation: make(map[string]string),
 		Synonyms:      []string{},
 		Antonyms:      []string{},
 		Translations:  make(map[string]string),
@@ -150,14 +146,6 @@ func (w *Word) AddUsageNote(note string) {
 	w.UpdatedAt = time.Now()
 }
 
-// SetPronunciation sets a pronunciation in the specified format
-func (w *Word) SetPronunciation(format, value string) {
-	if w.Pronunciation == nil {
-		w.Pronunciation = make(map[string]string)
-	}
-	w.Pronunciation[format] = value
-	w.UpdatedAt = time.Now()
-}
 
 // ValidateDefinition validates a definition based on language rules
 func (w *Word) ValidateDefinition(def Definition) error {

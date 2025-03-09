@@ -129,20 +129,19 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 	query := `
 		INSERT INTO words (
-			text, language, definitions, pronunciation, etymology, translations, 
+			text, language, definitions, etymology, translations, 
 			 search_terms, lemma, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (text, language) 
 		DO UPDATE SET 
 			definitions = $3,
-			pronunciation = $4,
-			etymology = $5,
-			translations = $6,
-			word_type = $7,
-			search_terms = $8,
-			lemma = $9,
-			updated_at = $10
+			etymology = $4,
+			translations = $5,
+			word_type = $6,
+			search_terms = $7,
+			lemma = $8,
+			updated_at = $9
 		RETURNING id
 	`
 
