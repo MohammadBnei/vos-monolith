@@ -175,10 +175,7 @@ func TestWiktionaryAPI_FetchSuggestions_SupportedLanguage(t *testing.T) {
 	api.scrapers["fr"] = mockScraper
 
 	// Setup expectations
-	expectedSuggestions := []*wordDomain.Word{
-		wordDomain.NewWord("test1", "fr"),
-		wordDomain.NewWord("test2", "fr"),
-	}
+	expectedSuggestions := []string{"test1", "test2"}
 	mockScraper.On("FetchSuggestions", mock.Anything, "test", "fr").Return(expectedSuggestions, nil)
 
 	// Execute

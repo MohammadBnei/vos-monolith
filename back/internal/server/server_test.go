@@ -331,15 +331,9 @@ func TestAutoComplete(t *testing.T) {
 	server := NewServer(cfg, logger, wordService)
 
 	// Mock word service response
-	testWords := []*word.Word{
-		{
-			Text:     "test1",
-			Language: "en",
-		},
-		{
-			Text:     "test2",
-			Language: "en",
-		},
+	testWords := []string{
+		"test1",
+		"test2",
 	}
 	wordService.On("AutoComplete", mock.Anything, "test", "en").Return(testWords, nil)
 

@@ -18,12 +18,13 @@ import (
 	"github.com/rs/zerolog"
 
 	wordDomain "voconsteroid/internal/domain/word"
+	"voconsteroid/internal/domain/word/languages/french"
 )
 
 // FrenchWiktionaryAPI implements the word.DictionaryAPI interface for French Wiktionary
 type FrenchWiktionaryAPI struct {
 	logger     zerolog.Logger
-	getBaseURL func(language string) string
+	getBaseURL func() string
 	lemmatizer *golem.Lemmatizer
 }
 
@@ -33,8 +34,8 @@ func NewFrenchWiktionaryAPI(logger zerolog.Logger) *FrenchWiktionaryAPI {
 
 	return &FrenchWiktionaryAPI{
 		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
-		getBaseURL: func(language string) string {
-			return "https://fr.wiktionary.org/wiki"
+		getBaseURL: func() string {
+			return "https://fr.wiktionary.org"
 		},
 		lemmatizer: lemmatizer,
 	}
@@ -142,7 +143,7 @@ func (w *FrenchWiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, lang
 	encodedPrefix := url.QueryEscape(prefix)
 
 	// Build the API URL
-	apiURL := fmt.Sprintf("https://fr.wiktionary.org/w/rest.php/v1/search/title?q=%s&limit=10", encodedPrefix)
+	apiURL := fmt.Sprintf("%s/w/rest.php/v1/search/title?q=%s&limit=10", w.getBaseURL(), encodedPrefix)
 
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
@@ -690,8 +691,8 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	})
 
 	// Build URL for the web page
-	baseURL := w.getBaseURL(language)
-	url := fmt.Sprintf("%s/%s", baseURL, text)
+	baseURL := w.getBaseURL()
+	url := fmt.Sprintf("%s/wiki/%s", baseURL, text)
 
 	// Check if context is done
 	select {
@@ -757,21 +758,21 @@ func cleanEtymology(etymologyText string) string {
 func (w *FrenchWiktionaryAPI) determineWordType(sectionTitle string) string {
 	switch {
 	case strings.Contains(sectionTitle, "Nom"):
-		return "noun"
+		return string(french.Noun)
 	case strings.Contains(sectionTitle, "Verbe"):
-		return "verb"
+		return string(french.Verb)
 	case strings.Contains(sectionTitle, "Adjectif"):
-		return "adjective"
+		return string(french.Adjective)
 	case strings.Contains(sectionTitle, "Adverbe"):
-		return "adverb"
+		return string(french.Adverb)
 	case strings.Contains(sectionTitle, "Pronom"):
-		return "pronoun"
+		return string(french.Pronoun)
 	case strings.Contains(sectionTitle, "Préposition"):
-		return "preposition"
+		return string(french.Preposition)
 	case strings.Contains(sectionTitle, "Conjonction"):
-		return "conjunction"
+		return string(french.Conjunction)
 	case strings.Contains(sectionTitle, "Interjection"):
-		return "interjection"
+		return string(french.Interjection)
 	default:
 		return ""
 	}

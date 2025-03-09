@@ -58,6 +58,7 @@ func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
 
 		// Validate French-specific fields
 		if def.WordType != "" {
+			t.Logf("Found word type: %s", def.WordType)
 			assert.True(t, french.IsValidWordType(french.WordType(def.WordType)),
 				"Word type should be valid for French")
 		}
@@ -127,7 +128,7 @@ func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
 
 	// Create a French Wiktionary API with a custom getBaseURL function
 	api := NewFrenchWiktionaryAPI(logger)
-	api.getBaseURL = func(language string) string {
+	api.getBaseURL = func() string {
 		return server.URL
 	}
 
@@ -203,7 +204,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotEmpty(t, suggestions)
-	
+
 	// Check that we got string suggestions
 	for _, suggestion := range suggestions {
 		assert.NotEmpty(t, suggestion)
@@ -243,7 +244,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_MockServer(t *testing.T) {
 	// Create a French Wiktionary API with a custom HTTP client
 	api := &FrenchWiktionaryAPI{
 		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
-		getBaseURL: func(language string) string {
+		getBaseURL: func() string {
 			return server.URL
 		},
 	}
@@ -273,7 +274,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_InvalidJSON(t *testing.T) {
 	// Create a French Wiktionary API with a custom HTTP client
 	api := &FrenchWiktionaryAPI{
 		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
-		getBaseURL: func(language string) string {
+		getBaseURL: func() string {
 			return server.URL
 		},
 	}
@@ -301,7 +302,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_ServerError(t *testing.T) {
 	// Create a French Wiktionary API with a custom HTTP client
 	api := &FrenchWiktionaryAPI{
 		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
-		getBaseURL: func(language string) string {
+		getBaseURL: func() string {
 			return server.URL
 		},
 	}
@@ -380,14 +381,14 @@ func TestFrenchWiktionaryAPI_DetermineWordType(t *testing.T) {
 		sectionTitle string
 		expectedType string
 	}{
-		{"Nom commun", "noun"},
-		{"Verbe", "verb"},
-		{"Adjectif", "adjective"},
-		{"Adverbe", "adverb"},
-		{"Pronom", "pronoun"},
-		{"Préposition", "preposition"},
-		{"Conjonction", "conjunction"},
-		{"Interjection", "interjection"},
+		{"Nom commun", string(french.Noun)},
+		{"Verbe", string(french.Verb)},
+		{"Adjectif", string(french.Adjective)},
+		{"Adverbe", string(french.Adverb)},
+		{"Pronom", string(french.Pronoun)},
+		{"Préposition", string(french.Preposition)},
+		{"Conjonction", string(french.Conjunction)},
+		{"Interjection", string(french.Interjection)},
 		{"Unknown", ""},
 	}
 
@@ -465,7 +466,7 @@ func TestWord_EntityMethods(t *testing.T) {
 	// Test AddDefinition
 	def := wordDomain.NewDefinition()
 	def.Text = "A test definition"
-	def.WordType = "noun"
+	def.WordType = "nom"
 	def.Examples = []string{"This is a test example"}
 	def.Gender = "masculine"
 	def.Pronunciation = "/tɛst/"
@@ -520,14 +521,14 @@ func TestWord_EntityMethods(t *testing.T) {
 	assert.Equal(t, 1, count, "Duplicate antonym should not be added")
 
 	// Test GetPrimaryWordType
-	assert.Equal(t, "noun", word.GetPrimaryWordType())
+	assert.Equal(t, "nom", word.GetPrimaryWordType())
 
 	// Test GetAllSpecifics
 	specifics := word.GetAllSpecifics()
 	assert.Contains(t, specifics, "tests")
 
 	// Test GetDefinitionsByType
-	nounDefs := word.GetDefinitionsByType("noun")
+	nounDefs := word.GetDefinitionsByType("nom")
 	assert.Len(t, nounDefs, 1)
 	assert.Equal(t, "A test definition", nounDefs[0].Text)
 
