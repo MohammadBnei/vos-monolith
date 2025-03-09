@@ -138,7 +138,7 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 			text, language, definitions, examples, pronunciation, etymology, translations, 
 			word_type, search_terms, lemma, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (text, language) 
 		DO UPDATE SET 
 			definitions = $3,
@@ -186,7 +186,7 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 	// Build query with filters
 	query := `
 		SELECT id, text, language, definitions, examples, pronunciation, etymology, translations, 
-		       word_type, forms, search_terms, lemma, created_at, updated_at
+		       word_type, search_terms, lemma, created_at, updated_at
 		FROM words
 		WHERE 1=1
 	`
