@@ -104,6 +104,8 @@ func TestSearch_ExistingWord(t *testing.T) {
 	// Expect repository to find the word
 	repo.On("FindByText", ctx, "test", "en").Return(expectedWord, nil)
 
+	repo.On("FindByAnyForm", ctx, "test", "en").Return(expectedWord, nil)
+
 	// Execute
 	word, err := svc.Search(ctx, "test", "en")
 
