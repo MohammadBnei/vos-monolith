@@ -41,6 +41,8 @@ The Vocabulary Learning App is designed to help users expand their vocabulary, u
 
 - [x] Basic word lookup functionality
 - [ ] User authentication system
+- [ ] Word saving system
+- [ ] Tags, Categories and Lists for personal words
 - [ ] Simple quiz system
 - [ ] Basic progress tracking
 
