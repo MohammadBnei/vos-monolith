@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
@@ -23,8 +24,8 @@ type WordSearchResponse struct {
 
 // RecentWordsRequest represents a request for recent words
 type RecentWordsRequest struct {
-	Language string `json:"language" binding:"required"`
-	Limit    int    `json:"limit,omitempty"`
+	Language string `form:"language"`
+	Limit    int    `form:"limit"`
 }
 
 // RecentWordsResponse represents the response for recent words
@@ -34,7 +35,7 @@ type RecentWordsResponse struct {
 
 // RelatedWordsRequest represents a request for related words
 type RelatedWordsRequest struct {
-	WordID string `uri:"id" binding:"required"`
+	WordID string `uri:"wordId" binding:"required"`
 }
 
 // RelatedWordsResponse represents the response for related words
@@ -46,8 +47,8 @@ type RelatedWordsResponse struct {
 
 // AutoCompleteRequest represents a request for autocomplete suggestions
 type AutoCompleteRequest struct {
-	Prefix   string `form:"prefix" binding:"required"`
-	Language string `form:"language" binding:"required"`
+	Prefix   string `form:"q" binding:"required,min=2"`
+	Language string `form:"lang" binding:"omitempty,oneof=fr en"`
 }
 
 // AutoCompleteResponse represents the response for autocomplete suggestions
@@ -116,34 +117,40 @@ func (s *Server) SearchWord(c *gin.Context) {
 // @Tags words
 // @Accept json
 // @Produce json
-// @Param request body RecentWordsRequest true "Recent words request"
+// @Param language query string false "Language code" Enums(fr, en) default(fr)
+// @Param limit query integer false "Maximum number of words to return" minimum(1) maximum(100) default(10)
 // @Success 200 {object} RecentWordsResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /api/v1/words/recent [post]
+// @Router /api/v1/words/recent [get]
 func (s *Server) GetRecentWords(c *gin.Context) {
 	log := c.MustGet("logger").(zerolog.Logger)
 
-	var req RecentWordsRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Debug().Err(err).Msg("Invalid recent words request")
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Status:  http.StatusBadRequest,
-			Message: "Invalid request",
-			Error:   err.Error(),
-		})
-		return
+	// Get parameters from query
+	language := c.Query("language")
+	if language == "" {
+		language = "fr" // Default to French
+	}
+	
+	limitStr := c.Query("limit")
+	limit := 10 // Default limit
+	if limitStr != "" {
+		var err error
+		limit, err = strconv.Atoi(limitStr)
+		if err != nil || limit < 1 || limit > 100 {
+			log.Debug().Err(err).Str("limit", limitStr).Msg("Invalid limit parameter")
+			c.JSON(http.StatusBadRequest, ErrorResponse{
+				Status:  http.StatusBadRequest,
+				Message: "Invalid limit parameter",
+				Error:   "Limit must be between 1 and 100",
+			})
+			return
+		}
 	}
 
-	// Default limit if not provided
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 10
-	}
+	log.Debug().Str("language", language).Int("limit", limit).Msg("Getting recent words")
 
-	log.Debug().Str("language", req.Language).Int("limit", limit).Msg("Getting recent words")
-
-	words, err := s.wordService.GetRecentWords(c.Request.Context(), req.Language, limit)
+	words, err := s.wordService.GetRecentWords(c.Request.Context(), language, limit)
 	if err != nil {
 		log.Error().Err(err).Msg("Error getting recent words")
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -165,8 +172,8 @@ func (s *Server) GetRecentWords(c *gin.Context) {
 // @Tags words
 // @Accept json
 // @Produce json
-// @Param prefix query string true "Word prefix"
-// @Param language query string true "Language code"
+// @Param q query string true "The prefix to search for" minlength(2)
+// @Param lang query string false "Language code" Enums(fr, en)
 // @Success 200 {object} AutoCompleteResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
@@ -185,9 +192,15 @@ func (s *Server) AutoComplete(c *gin.Context) {
 		return
 	}
 
-	log.Debug().Str("prefix", req.Prefix).Str("language", req.Language).Msg("Getting autocomplete suggestions")
+	// Default to French if no language specified
+	language := req.Language
+	if language == "" {
+		language = "fr"
+	}
 
-	suggestions, err := s.wordService.GetSuggestions(c.Request.Context(), req.Prefix, req.Language)
+	log.Debug().Str("prefix", req.Prefix).Str("language", language).Msg("Getting autocomplete suggestions")
+
+	suggestions, err := s.wordService.GetSuggestions(c.Request.Context(), req.Prefix, language)
 	if err != nil {
 		log.Debug().Err(err).Str("prefix", req.Prefix).Str("language", req.Language).Msg("Failed to get autocomplete suggestions")
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
@@ -209,29 +222,29 @@ func (s *Server) AutoComplete(c *gin.Context) {
 // @Tags words
 // @Accept json
 // @Produce json
-// @Param id path string true "Word ID"
+// @Param wordId path string true "Word ID"
 // @Success 200 {object} RelatedWordsResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
-// @Router /api/v1/words/{id}/related [get]
+// @Router /api/v1/words/{wordId}/related [get]
 func (s *Server) GetRelatedWords(c *gin.Context) {
 	log := c.MustGet("logger").(zerolog.Logger)
 
-	var req RelatedWordsRequest
-	if err := c.ShouldBindUri(&req); err != nil {
-		log.Debug().Err(err).Msg("Invalid related words request")
+	wordId := c.Param("wordId")
+	if wordId == "" {
+		log.Debug().Msg("Missing wordId parameter")
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Status:  http.StatusBadRequest,
-			Message: "Invalid request",
-			Error:   err.Error(),
+			Message: "Missing wordId parameter",
+			Error:   "wordId is required",
 		})
 		return
 	}
 
-	log.Debug().Str("wordID", req.WordID).Msg("Getting related words")
+	log.Debug().Str("wordId", wordId).Msg("Getting related words")
 
-	relatedWords, err := s.wordService.GetRelatedWords(c.Request.Context(), req.WordID)
+	relatedWords, err := s.wordService.GetRelatedWords(c.Request.Context(), wordId)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if errors.Is(err, word.ErrWordNotFound) {

@@ -129,8 +129,8 @@ func (s *Server) setupRoutes() {
 		words := api.Group("/words")
 		{
 			words.POST("/search", s.SearchWord)
-			words.POST("/recent", s.GetRecentWords)
-			words.GET("/:id/related", s.GetRelatedWords)
+			words.GET("/recent", s.GetRecentWords)
+			words.GET("/:wordId/related", s.GetRelatedWords)
 			words.GET("/autocomplete", s.AutoComplete)
 		}
 	}
