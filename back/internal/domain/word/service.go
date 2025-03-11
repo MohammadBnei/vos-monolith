@@ -21,6 +21,9 @@ type Service interface {
 
 	// AutoComplete provides autocomplete suggestions based on prefix and language
 	AutoComplete(ctx context.Context, prefix, language string) ([]string, error)
+	
+	// GetSuggestions retrieves word suggestions based on a prefix
+	GetSuggestions(ctx context.Context, prefix, language string) ([]string, error)
 }
 
 // RelatedWords groups words related to a specific word

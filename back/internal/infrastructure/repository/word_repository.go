@@ -25,6 +25,9 @@ type WordRepository struct {
 	logger zerolog.Logger
 }
 
+// Ensure WordRepository implements word.Repository
+var _ word.Repository = (*WordRepository)(nil)
+
 // NewWordRepository creates a new word repository
 func NewWordRepository(db DBInterface, logger zerolog.Logger) *WordRepository {
 	return &WordRepository{
@@ -33,11 +36,67 @@ func NewWordRepository(db DBInterface, logger zerolog.Logger) *WordRepository {
 	}
 }
 
+// FindByID retrieves a word by its ID
+func (r *WordRepository) FindByID(ctx context.Context, id string) (*word.Word, error) {
+	r.logger.Debug().Str("id", id).Msg("Finding word by ID")
+
+	query := `
+		SELECT id, text, language, definitions, etymology, translations, 
+		       synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
+		FROM words
+		WHERE id = $1
+	`
+
+	var w word.Word
+	var definitionsJSON []byte
+	var searchTerms []string
+	var translations map[string]string
+	var synonyms []string
+	var antonyms []string
+	var usageNotes []string
+
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&w.ID,
+		&w.Text,
+		&w.Language,
+		&definitionsJSON,
+		&w.Etymology,
+		&translations,
+		&synonyms,
+		&antonyms,
+		&searchTerms,
+		&w.Lemma,
+		&usageNotes,
+		&w.CreatedAt,
+		&w.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, word.ErrWordNotFound
+		}
+		return nil, fmt.Errorf("failed to query word by ID: %w", err)
+	}
+
+	// Parse definitions JSON
+	if err := json.Unmarshal(definitionsJSON, &w.Definitions); err != nil {
+		return nil, fmt.Errorf("failed to parse definitions: %w", err)
+	}
+
+	w.SearchTerms = searchTerms
+	w.Translations = translations
+	w.Synonyms = synonyms
+	w.Antonyms = antonyms
+	w.UsageNotes = usageNotes
+
+	return &w, nil
+}
+
 // FindByText retrieves a word by its text and language
 func (r *WordRepository) FindByText(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, etymology, translations, 
-		       search_terms, lemma, created_at, updated_at
+		       synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
 		FROM words
 		WHERE text = $1 AND language = $2
 	`
@@ -46,6 +105,9 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 	var definitionsJSON []byte
 	var searchTerms []string
 	var translations map[string]string
+	var synonyms []string
+	var antonyms []string
+	var usageNotes []string
 
 	err := r.db.QueryRow(ctx, query, text, language).Scan(
 		&w.ID,
@@ -54,8 +116,11 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 		&definitionsJSON,
 		&w.Etymology,
 		&translations,
+		&synonyms,
+		&antonyms,
 		&searchTerms,
 		&w.Lemma,
+		&usageNotes,
 		&w.CreatedAt,
 		&w.UpdatedAt,
 	)
@@ -74,6 +139,9 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 
 	w.SearchTerms = searchTerms
 	w.Translations = translations
+	w.Synonyms = synonyms
+	w.Antonyms = antonyms
+	w.UsageNotes = usageNotes
 
 	return &w, nil
 }
@@ -82,7 +150,7 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, etymology, translations, 
-		        search_terms, lemma, created_at, updated_at
+		        synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
 		FROM words
 		WHERE language = $1 AND $2 = ANY(search_terms)
 	`
@@ -91,6 +159,9 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 	var definitionsJSON []byte
 	var searchTerms []string
 	var translations map[string]string
+	var synonyms []string
+	var antonyms []string
+	var usageNotes []string
 
 	err := r.db.QueryRow(ctx, query, language, text).Scan(
 		&w.ID,
@@ -99,8 +170,11 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 		&definitionsJSON,
 		&w.Etymology,
 		&translations,
+		&synonyms,
+		&antonyms,
 		&searchTerms,
 		&w.Lemma,
+		&usageNotes,
 		&w.CreatedAt,
 		&w.UpdatedAt,
 	)
@@ -119,6 +193,9 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 
 	w.SearchTerms = searchTerms
 	w.Translations = translations
+	w.Synonyms = synonyms
+	w.Antonyms = antonyms
+	w.UsageNotes = usageNotes
 
 	return &w, nil
 }
@@ -127,19 +204,22 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 	query := `
 		INSERT INTO words (
-			text, language, definitions, etymology, translations, 
-			 search_terms, lemma, created_at, updated_at
+			id, text, language, definitions, etymology, translations, 
+			synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (text, language) 
 		DO UPDATE SET 
-			definitions = $3,
-			etymology = $4,
-			translations = $5,
-			search_terms = $6,
-			lemma = $7,
-			created_at = $8,
-			updated_at = $9
+			definitions = $4,
+			etymology = $5,
+			translations = $6,
+			synonyms = $7,
+			antonyms = $8,
+			search_terms = $9,
+			lemma = $10,
+			usage_notes = $11,
+			created_at = $12,
+			updated_at = $13
 		RETURNING id
 	`
 
@@ -149,6 +229,11 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 		w.CreatedAt = now
 	}
 
+	// Generate ID if not set
+	if w.ID == "" {
+		w.ID = uuid.New().String()
+	}
+
 	// Convert definitions to JSON
 	definitionsJSON, err := json.Marshal(w.Definitions)
 	if err != nil {
@@ -156,23 +241,27 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 	}
 
 	return r.db.QueryRow(ctx, query,
+		w.ID,
 		w.Text,
 		w.Language,
 		definitionsJSON,
 		w.Etymology,
 		w.Translations,
+		w.Synonyms,
+		w.Antonyms,
 		w.SearchTerms,
 		w.Lemma,
+		w.UsageNotes,
 		w.CreatedAt,
 		w.UpdatedAt,
 	).Scan(&w.ID)
 }
 
-// List retrieves words with optional filtering
+// FindByPrefix retrieves words by prefix and language
 func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language string, limit int) ([]*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, etymology, 
-		       translations, search_terms, lemma, created_at, updated_at
+		       translations, synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
 		FROM words
 		WHERE language = $1 
 		  AND EXISTS (SELECT 1 FROM unnest(search_terms) AS term 
@@ -193,6 +282,9 @@ func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language stri
 		var definitionsJSON []byte
 		var searchTerms []string
 		var translations map[string]string
+		var synonyms []string
+		var antonyms []string
+		var usageNotes []string
 
 		if err := rows.Scan(
 			&w.ID,
@@ -201,8 +293,11 @@ func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language stri
 			&definitionsJSON,
 			&w.Etymology,
 			&translations,
+			&synonyms,
+			&antonyms,
 			&searchTerms,
 			&w.Lemma,
+			&usageNotes,
 			&w.CreatedAt,
 			&w.UpdatedAt,
 		); err != nil {
@@ -215,6 +310,9 @@ func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language stri
 
 		w.SearchTerms = searchTerms
 		w.Translations = translations
+		w.Synonyms = synonyms
+		w.Antonyms = antonyms
+		w.UsageNotes = usageNotes
 
 		words = append(words, &w)
 	}
@@ -304,4 +402,40 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 	}
 
 	return words, nil
+}
+// FindSuggestions retrieves word suggestions based on a prefix
+func (r *WordRepository) FindSuggestions(ctx context.Context, prefix, language string, limit int) ([]string, error) {
+	r.logger.Debug().Str("prefix", prefix).Str("language", language).Int("limit", limit).Msg("Finding suggestions")
+
+	query := `
+		SELECT text
+		FROM words
+		WHERE language = $1 AND text ILIKE $2 || '%'
+		ORDER BY updated_at DESC
+		LIMIT $3
+	`
+
+	rows, err := r.db.Query(ctx, query, language, prefix, limit)
+	if err != nil {
+		r.logger.Error().Err(err).Msg("Error finding suggestions")
+		return nil, fmt.Errorf("error finding suggestions: %w", err)
+	}
+	defer rows.Close()
+
+	var suggestions []string
+	for rows.Next() {
+		var text string
+		if err := rows.Scan(&text); err != nil {
+			r.logger.Error().Err(err).Msg("Error scanning suggestion")
+			continue
+		}
+		suggestions = append(suggestions, text)
+	}
+
+	if err := rows.Err(); err != nil {
+		r.logger.Error().Err(err).Msg("Error iterating suggestions")
+		return nil, fmt.Errorf("error iterating suggestions: %w", err)
+	}
+
+	return suggestions, nil
 }

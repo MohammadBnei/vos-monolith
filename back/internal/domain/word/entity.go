@@ -11,6 +11,8 @@ import (
 var (
 	ErrInvalidWordType = errors.New("invalid word type")
 	ErrInvalidGender   = errors.New("invalid gender")
+	ErrWordNotFound    = errors.New("word not found")
+	ErrInvalidWord     = errors.New("invalid word")
 )
 
 // Definition represents a single definition with its type and examples
@@ -44,7 +46,9 @@ type Word struct {
 // NewWord creates a new Word entity
 func NewWord(text, language string) *Word {
 	now := time.Now()
+	id := uuid.New().String()
 	return &Word{
+		ID:            id,
 		Text:          text,
 		Language:      language,
 		Definitions:   []Definition{},

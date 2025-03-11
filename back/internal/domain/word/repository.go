@@ -6,6 +6,9 @@ import (
 
 // Repository defines the interface for word data access
 type Repository interface {
+	// FindByID retrieves a word by its ID
+	FindByID(ctx context.Context, id string) (*Word, error)
+	
 	// FindByText retrieves a word by its text and language
 	FindByText(ctx context.Context, text, language string) (*Word, error)
 
@@ -20,4 +23,7 @@ type Repository interface {
 
 	// FindByPrefix retrieves words by prefix and language
 	FindByPrefix(ctx context.Context, prefix, language string, limit int) ([]*Word, error)
+	
+	// FindSuggestions retrieves word suggestions based on a prefix
+	FindSuggestions(ctx context.Context, prefix, language string, limit int) ([]string, error)
 }
