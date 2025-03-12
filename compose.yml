@@ -1,26 +1,23 @@
 services:
-  # api:
-  #   build:
-  #     context: ./back
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     - ENV=${ENV:-development}
-  #     - APP_NAME=${APP_NAME:-Voc on Steroid}
-  #     - HTTP_PORT=${HTTP_PORT:-8080}
-  #     - LOG_LEVEL=${LOG_LEVEL:-debug}
-  #     - DATABASE_URL=postgres://user:password@postgres:5432/voconsteroid
-  #     - REDIS_URL=redis://redis:6379
-  #     - JWT_SECRET=${JWT_SECRET:-dev_secret_key}
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./back:/app
-  #   restart: unless-stopped
+  api:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    environment:
+      - ENV=${ENV:-development}
+      - APP_NAME=${APP_NAME:-Voc on Steroid}
+      - HTTP_PORT=${HTTP_PORT:-8080}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      - DATABASE_URL=postgres://user:password@postgres:5432/voconsteroid
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-dev_secret_key}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   postgres:
     image: postgres:16-alpine

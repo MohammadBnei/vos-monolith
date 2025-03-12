@@ -110,7 +110,7 @@ type Definition struct {
   LanguageSpecifics map[string]string `json:"language_specifics,omitempty"` // E.g., plural forms
   Notes            []string          `json:"notes,omitempty"`  // Additional usage metadata
   CreatedAt        time.Time         `json:"created_at"`       // Timestamp for when the definition was created
-    UpdatedAt        time.Time         `json:"updated_at"`       // Timestamp for the last update to the definition
+  UpdatedAt        time.Time         `json:"updated_at"`       // Timestamp for the last update to the definition
 }
 ```
 

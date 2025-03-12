@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog"
 
@@ -269,7 +270,7 @@ func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language stri
 		ORDER BY text <-> $2  -- Use pg_trgm similarity operator
 		LIMIT $3
 	`
-	
+
 	var words []*word.Word
 	rows, err := r.db.Query(ctx, query, language, prefix, limit)
 	if err != nil {
@@ -403,6 +404,7 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 
 	return words, nil
 }
+
 // FindSuggestions retrieves word suggestions based on a prefix
 func (r *WordRepository) FindSuggestions(ctx context.Context, prefix, language string, limit int) ([]string, error) {
 	r.logger.Debug().Str("prefix", prefix).Str("language", language).Int("limit", limit).Msg("Finding suggestions")

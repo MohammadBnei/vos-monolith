@@ -4,7 +4,9 @@ import "errors"
 
 // Domain errors
 var (
-	ErrWordNotFound  = errors.New("word not found")
-	ErrInvalidWord   = errors.New("invalid word")
-	ErrDuplicateWord = errors.New("word already exists")
+	ErrInvalidWordType = errors.New("invalid word type")
+	ErrInvalidGender   = errors.New("invalid gender")
+	ErrWordNotFound    = errors.New("word not found")
+	ErrInvalidWord     = errors.New("invalid word")
+	ErrDuplicateWord   = errors.New("word already exists")
 )

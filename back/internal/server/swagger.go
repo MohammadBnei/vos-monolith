@@ -4,6 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "voconsteroid/docs"
 )
 
 // setupSwagger configures the Swagger documentation routes
@@ -13,13 +15,17 @@ func (s *Server) setupSwagger() {
 		s.log.Info().Msg("Enabling Swagger UI in development mode")
 
 		// Serve the Swagger UI
-		s.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-		
+		s.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
+			ginSwagger.DocExpansion("list"),    // Can be 'list', 'full', or 'none'
+			ginSwagger.InstanceName("swagger"), // Unique instance name
+			ginSwagger.PersistAuthorization(true)),
+		)
+
 		// Serve the index.html file that redirects to Swagger UI
 		s.router.GET("/", func(c *gin.Context) {
 			c.File("./internal/server/swagger_files/index.html")
 		})
-		
+
 		// Log Swagger UI URL
 		s.log.Info().Msg("Swagger UI available at: /swagger/index.html")
 	} else {

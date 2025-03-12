@@ -121,7 +121,7 @@ func (s *service) GetRelatedWords(ctx context.Context, wordID string) (*RelatedW
 	// If the word has no synonyms or antonyms, fetch them
 	if len(word.Synonyms) == 0 && len(word.Antonyms) == 0 {
 		s.logger.Debug().Str("wordID", wordID).Msg("Fetching related words from API")
-		
+
 		// Fetch related words from API
 		relatedWords, err := s.dictAPI.FetchRelatedWords(ctx, word)
 		if err != nil {
@@ -180,7 +180,7 @@ func (s *service) GetRelatedWords(ctx context.Context, wordID string) (*RelatedW
 // AutoComplete provides autocomplete suggestions based on prefix and language
 func (s *service) AutoComplete(ctx context.Context, prefix, language string) ([]string, error) {
 	s.logger.Debug().Str("prefix", prefix).Str("language", language).Msg("Getting autocomplete suggestions")
-	
+
 	return s.GetSuggestions(ctx, prefix, language)
 }
 

@@ -1,18 +1,12 @@
 package word
 
 import (
-	"errors"
 	"time"
+
+	"github.com/google/uuid"
 
 	"voconsteroid/internal/domain/word/languages/english"
 	"voconsteroid/internal/domain/word/languages/french"
-)
-
-var (
-	ErrInvalidWordType = errors.New("invalid word type")
-	ErrInvalidGender   = errors.New("invalid gender")
-	ErrWordNotFound    = errors.New("word not found")
-	ErrInvalidWord     = errors.New("invalid word")
 )
 
 // Definition represents a single definition with its type and examples
@@ -24,23 +18,25 @@ type Definition struct {
 	Pronunciation     string            `json:"pronunciation,omitempty"`
 	LanguageSpecifics map[string]string `json:"language_specifics,omitempty"`
 	Notes             []string          `json:"notes,omitempty"`
+	CreatedAt         time.Time         `json:"created_at"`
+	UpdatedAt         time.Time         `json:"updated_at"`
 }
 
 // Word represents a vocabulary word with its definitions and metadata
 type Word struct {
-	ID            string            `json:"id"`
-	Text          string            `json:"text"` // The canonical form
-	Language      string            `json:"language"`
-	Definitions   []Definition      `json:"definitions,omitempty"`
-	Etymology     string            `json:"etymology,omitempty"`
-	Translations  map[string]string `json:"translations,omitempty"`
-	Synonyms      []string          `json:"synonyms,omitempty"`
-	Antonyms      []string          `json:"antonyms,omitempty"`
-	SearchTerms   []string          `json:"search_terms,omitempty"` // All searchable forms of the word
-	Lemma         string            `json:"lemma,omitempty"`        // Base form of the word
-	UsageNotes    []string          `json:"usage_notes,omitempty"`  // General usage information
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
+	ID           string            `json:"id"`
+	Text         string            `json:"text"` // The canonical form
+	Language     string            `json:"language"`
+	Definitions  []Definition      `json:"definitions,omitempty"`
+	Etymology    string            `json:"etymology,omitempty"`
+	Translations map[string]string `json:"translations,omitempty"`
+	Synonyms     []string          `json:"synonyms,omitempty"`
+	Antonyms     []string          `json:"antonyms,omitempty"`
+	SearchTerms  []string          `json:"search_terms,omitempty"` // All searchable forms of the word
+	Lemma        string            `json:"lemma,omitempty"`        // Base form of the word
+	UsageNotes   []string          `json:"usage_notes,omitempty"`  // General usage information
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
 }
 
 // NewWord creates a new Word entity
@@ -48,17 +44,17 @@ func NewWord(text, language string) *Word {
 	now := time.Now()
 	id := uuid.New().String()
 	return &Word{
-		ID:            id,
-		Text:          text,
-		Language:      language,
-		Definitions:   []Definition{},
-		Synonyms:      []string{},
-		Antonyms:      []string{},
-		Translations:  make(map[string]string),
-		SearchTerms:   []string{text}, // Initialize with the main text as a search term
-		UsageNotes:    []string{},
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		ID:           id,
+		Text:         text,
+		Language:     language,
+		Definitions:  []Definition{},
+		Synonyms:     []string{},
+		Antonyms:     []string{},
+		Translations: make(map[string]string),
+		SearchTerms:  []string{text}, // Initialize with the main text as a search term
+		UsageNotes:   []string{},
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 }
 
@@ -149,7 +145,6 @@ func (w *Word) AddUsageNote(note string) {
 	w.UsageNotes = append(w.UsageNotes, note)
 	w.UpdatedAt = time.Now()
 }
-
 
 // ValidateDefinition validates a definition based on language rules
 func (w *Word) ValidateDefinition(def Definition) error {

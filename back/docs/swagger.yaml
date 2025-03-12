@@ -1,0 +1,268 @@
+definitions:
+  server.AutoCompleteResponse:
+    properties:
+      suggestions:
+        items:
+          type: string
+        type: array
+    type: object
+  server.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+      status:
+        type: integer
+    type: object
+  server.RecentWordsResponse:
+    properties:
+      words:
+        items:
+          $ref: '#/definitions/word.Word'
+        type: array
+    type: object
+  server.RelatedWordsResponse:
+    properties:
+      antonyms:
+        items:
+          $ref: '#/definitions/word.Word'
+        type: array
+      source_word:
+        $ref: '#/definitions/word.Word'
+      synonyms:
+        items:
+          $ref: '#/definitions/word.Word'
+        type: array
+    type: object
+  server.WordSearchRequest:
+    properties:
+      language:
+        type: string
+      text:
+        type: string
+    required:
+    - language
+    - text
+    type: object
+  server.WordSearchResponse:
+    properties:
+      word:
+        $ref: '#/definitions/word.Word'
+    type: object
+  word.Definition:
+    properties:
+      examples:
+        items:
+          type: string
+        type: array
+      gender:
+        type: string
+      language_specifics:
+        additionalProperties:
+          type: string
+        type: object
+      notes:
+        items:
+          type: string
+        type: array
+      pronunciation:
+        type: string
+      text:
+        type: string
+      word_type:
+        description: noun, verb, adjective, etc.
+        type: string
+    type: object
+  word.Word:
+    properties:
+      antonyms:
+        items:
+          type: string
+        type: array
+      created_at:
+        type: string
+      definitions:
+        items:
+          $ref: '#/definitions/word.Definition'
+        type: array
+      etymology:
+        type: string
+      id:
+        type: string
+      language:
+        type: string
+      lemma:
+        description: Base form of the word
+        type: string
+      search_terms:
+        description: All searchable forms of the word
+        items:
+          type: string
+        type: array
+      synonyms:
+        items:
+          type: string
+        type: array
+      text:
+        description: The canonical form
+        type: string
+      translations:
+        additionalProperties:
+          type: string
+        type: object
+      updated_at:
+        type: string
+      usage_notes:
+        description: General usage information
+        items:
+          type: string
+        type: array
+    type: object
+info:
+  contact: {}
+paths:
+  /api/v1/words/{wordId}/related:
+    get:
+      consumes:
+      - application/json
+      description: Get synonyms and antonyms for a word
+      parameters:
+      - description: Word ID
+        in: path
+        name: wordId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.RelatedWordsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get related words
+      tags:
+      - words
+  /api/v1/words/autocomplete:
+    get:
+      consumes:
+      - application/json
+      description: Get word suggestions based on prefix
+      parameters:
+      - description: The prefix to search for
+        in: query
+        minLength: 2
+        name: q
+        required: true
+        type: string
+      - description: Language code
+        enum:
+        - fr
+        - en
+        in: query
+        name: lang
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.AutoCompleteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get autocomplete suggestions
+      tags:
+      - words
+  /api/v1/words/recent:
+    get:
+      consumes:
+      - application/json
+      description: Get recently searched words
+      parameters:
+      - default: fr
+        description: Language code
+        enum:
+        - fr
+        - en
+        in: query
+        name: language
+        type: string
+      - default: 10
+        description: Maximum number of words to return
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.RecentWordsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get recent words
+      tags:
+      - words
+  /api/v1/words/search:
+    post:
+      consumes:
+      - application/json
+      description: Search for a word by text and language
+      parameters:
+      - description: Word search request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/server.WordSearchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.WordSearchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Search for a word
+      tags:
+      - words
+swagger: "2.0"
