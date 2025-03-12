@@ -18,32 +18,31 @@
       - [Definition](#definition-1)
       - [Properties](#properties-1)
       - [Responsibilities](#responsibilities-1)
-      - [Relationships](#relationships)
     - [**3.4 Value Object: Translation**](#34-value-object-translation)
       - [Definition](#definition-2)
       - [Properties](#properties-2)
       - [Example](#example)
-      - [Responsibilities](#responsibilities-2)
-    - [**3.5 Invariants (Consistency Rules)**](#35-invariants-consistency-rules)
-      - [1. Word Invariants](#1-word-invariants)
-      - [2. Definition Invariants](#2-definition-invariants)
+    - [**3.5 Enrichment Handling**](#35-enrichment-handling)
+    - [**3.6 Invariants (Consistency Rules)**](#36-invariants-consistency-rules)
+      - [Word Invariants](#word-invariants)
+      - [Definition Invariants](#definition-invariants)
   - [**4. Domain Services**](#4-domain-services)
-    - [**4.1 Word Factory**](#41-word-factory)
-    - [**4.2 Key Operations**](#42-key-operations)
-      - [1. Add a New Definition](#1-add-a-new-definition)
-      - [2. Enrich Synonyms](#2-enrich-synonyms)
+    - [Key Operations](#key-operations)
+      - [1. Add New Definition](#1-add-new-definition)
+      - [2. Merge Translations](#2-merge-translations)
   - [**5. Relationships with Other Domains**](#5-relationships-with-other-domains)
   - [**6. Persistence**](#6-persistence)
-    - [Tables](#tables)
   - [**7. Future Considerations**](#7-future-considerations)
+
+---
 
 ## **1. Purpose**
 
 ### Overview
 
-The **Word Domain** is the primary **core domain** of the application, encapsulating the concept of a "word" with all its associated information and relationships. It governs the **state** of vocabulary data, ensures data **consistency**, and enforces **business rules** around words.
+The **Word Domain** is the primary **core domain** of the application, encapsulating the concept of a "word" with all its associated information and relationships. It governs the **state** of vocabulary data, ensures data **consistency**, and enforces **business rules** around words while supporting **partial word data** for progressive enrichment.
 
-The Word domain contains entities (e.g., `Word`, `Definition`) and value objects (e.g., `Translation`). It interacts with supporting services (e.g., **Word Lookup**) to retrieve external data for enriching the domain model.
+The **Word domain** contains entities (e.g., `Word`, `Definition`) and value objects (e.g., `Translation`). It interacts with supporting services (e.g., **Word Lookup**) to retrieve external data and enrich the domain model over time.
 
 ---
 
@@ -54,10 +53,11 @@ The Word domain contains entities (e.g., `Word`, `Definition`) and value objects
 The Word domain represents the "real-world vocabulary" comprising:
 
 - Linguistic properties like its definitions, etymology, synonyms, and antonyms.
-- Usage details, provided for better contextual understanding.
+- Usage details provided for better contextual understanding.
 - Multilingual aspects by including translations into other languages.
+- Metadata to track the completeness of vocabulary data fields.
 
-This domain ensures words are organized and structured in a way that supports learning, navigating saved words, contextual usage, and future features like quizzes and learning algorithms.
+This domain ensures words are **progressively enriched** and structured in a way that supports learning, navigating saved words, contextual usage, and future features like quizzes and learning algorithms.
 
 ---
 
@@ -67,15 +67,15 @@ This domain ensures words are organized and structured in a way that supports le
 
 #### What is the Word Aggregate Root?
 
-The `Word` is the **aggregate root** of the Word domain. It encapsulates:
+The `Word` is the **aggregate root** in the Word domain. It encapsulates:
 
-- **Entities**: Relationships between `Word` and its associated `Definition` entities.
-- **Value Objects**: Concepts like `Translation` are immutable value objects that add logical meaning to `Word`.
+- **Entities**: Relationships between `Word` and its associated `Definition`.
+- **Value Objects**: Concepts like `Translation` that add logical meaning.
 
 The `Word` aggregate ensures consistency within its own boundaries:
 
-- No duplicate definitions.
-- No conflicting translations.
+1. No duplicate definitions.
+2. Translations grouped uniquely by language, ensuring no conflicts.
 
 ---
 
@@ -83,33 +83,38 @@ The `Word` aggregate ensures consistency within its own boundaries:
 
 #### Definition
 
-A `Word` is the central entity of the Word domain, representing a vocabulary word in its canonical form along with associated linguistic data.
+A `Word` is the central entity of the Word domain, representing a vocabulary word in its canonical form along with associated linguistic data, including partial data.
 
 #### Properties
 
 ```go
 type Word struct {
- ID            string              // Unique identifier of the word (UUID)
+ ID            string              // Unique identifier for the word (UUID)
  Text          string              // Canonical lemma (e.g., "run", "marécage")
- Language      string              // ISO 639-1 language code (e.g., "en", "fr")
+ Language      string              // ISO 639-1 language code
  Definitions   []Definition        // Array of enriched definitions
- Etymology     string              // Historical origin of the word (optional)
- Translations  map[string][]string // Translations grouped by language (e.g., "fr" -> ["marais"])
- Synonyms      []string            // List of synonyms for the word
- Antonyms      []string            // List of antonyms for the word
- SearchTerms   []string            // Variants of the word for easier searching
- Lemma         string              // Base form of the word if `Text` is conjugated
- UsageNotes    []string            // Notes for contextual usage
- CreatedAt     time.Time           // Timestamp for word creation
- UpdatedAt     time.Time           // Timestamp for last word update
+ Etymology     *string             // Historical origin (optional)
+ Translations  map[string][]string // Language-based translations
+ Synonyms      []string            // Synonyms for the word
+ Antonyms      []string            // Antonyms for the word
+ SearchTerms   []string            // Searchable variants of the word
+ Lemma         string              // Base form of the word
+ UsageNotes    []string            // Usage or idiomatic notes
+ Enrichment    EnrichmentStatus    // Tracks completeness of word data
+ CreatedAt     time.Time           // Created timestamp
+ UpdatedAt     time.Time           // Updated timestamp
 }
 ```
 
 #### Responsibilities
 
-1. Ensure consistency between related entities like `Definition` and `Translation`.
-2. Provide a structure for multilingual data (e.g., synonyms, antonyms, and translations).
-3. Represent real-world vocabulary accurately, encapsulating linguistic and contextual aspects.
+The `Word` is responsible for:
+
+1. Representing the core properties of a vocabulary word.
+2. Validating business rules, e.g.:
+   - At least one `Definition` must exist.
+   - Translating external data structures into domain formats.
+3. Tracking enrichment status via a separate field.
 
 ---
 
@@ -117,34 +122,28 @@ type Word struct {
 
 #### Definition
 
-A `Definition` represents a **semantic explanation** of a `Word`. A single `Word` can have one or more definitions depending on its linguistic or contextual usage.
+A `Definition` provides the semantic explanation of a `Word`.
 
 #### Properties
 
 ```go
 type Definition struct {
- ID               string              // Unique identifier for the definition (UUID)
- Text             string              // The core definition text
- WordType         string              // Grammatical type (e.g., noun, verb)
- Examples         []string            // Examples that clarify usage
- Gender           string              // Gender of the word (e.g., "masculine", "feminine" in French)
- Pronunciation    string              // Phonetics or IPA notation (e.g., "/rəˈnæt/ for run")
- LanguageSpecifics map[string]string  // Additional language-based details (e.g., plural forms)
- Notes            []string            // Supplementary notes
- CreatedAt        time.Time           // Timestamp for when the definition was created
- UpdatedAt        time.Time           // Timestamp for when the definition was last updated
+ ID               string              // Unique identifier for the definition
+ Text             string              // Explanation of the word
+ WordType         string              // Grammatical type of the word
+ Examples         []string            // Example sentences (optional)
+ Gender           string              // Gender information
+ Pronunciation    *string             // Pronunciation in IPA
+ LanguageSpecifics map[string]string  // Plural forms, gender specifics, etc.
+ CreatedAt        time.Time           // Created timestamp
+ UpdatedAt        time.Time           // Updated timestamp
 }
 ```
 
 #### Responsibilities
 
-1. Provide linguistic meaning for a `Word`.
-2. Store grammatical, gender, and phonetic information.
-3. Store contextual examples to enrich understanding of the meaning.
-
-#### Relationships
-
-- A `Word` can have **multiple Definitions**, often corresponding to different contexts or grammatical types.
+1. Represent linguistic meaning and context for a `Word`.
+2. Support hierarchical structure (e.g., relationships to word types).
 
 ---
 
@@ -152,91 +151,85 @@ type Definition struct {
 
 #### Definition
 
-A `Translation` represents the equivalence of a `Word` in another language. It is an **immutable value object**, meaning once created, it cannot be changed.
+Stores groupings of cross-language translations as a map.
 
 #### Properties
 
 ```go
-Translations map[string][]string // Map of [language code] -> [array of translated terms]
+Translations map[string][]string // Map of language codes -> array of translated terms
 ```
 
 #### Example
 
 ```json
 {
-    "translations": {
-        "en": ["marsh", "swamp", "bog"],
-        "de": ["Sumpf"],
-        "es": ["pantano", "ciénaga"]
-    }
+  "translations": {
+    "en": ["swamp", "marsh"],
+    "de": ["Sumpf"],
+    "fr": []
+  }
 }
 ```
 
-- **Key**: Language code (e.g., "en", "de").
-- **Value**: Array of translations in the target language.
+---
 
-#### Responsibilities
+### **3.5 Enrichment Handling**
 
-1. Encapsulate cross-context vocabulary relationships (e.g., synonyms in other languages).
-2. Ensure consistent and clean representation of multilingual data.
+Enrichment Status tracks missing fields across the `Word` object. Example:
+
+```json
+"enrichment": {
+  "definitions": true,
+  "translations": false,
+  "etymology": true,
+  "examples": false,
+  "synonyms": true,
+  "antonyms": false
+}
+```
 
 ---
 
-### **3.5 Invariants (Consistency Rules)**
+### **3.6 Invariants (Consistency Rules)**
 
-#### 1. Word Invariants
+#### Word Invariants
 
-- A `Word` must have at least one `Definition`.
-- `Text` must be unique when combined with `Language` (e.g., "run:en" and "run:fr" are distinct).
-- No duplicate values in synonyms, antonyms, or translations.
+1. A `Word` must always have:
+   - Valid `Text` and `Language`.
+   - At least one `Definition`.
 
-#### 2. Definition Invariants
+#### Definition Invariants
 
-- `Examples` should be unique for each definition to avoid redundancy.
-- Every `WordType` must map to known grammatical categories ("noun", "verb", etc.).
+1. Each `Example` for a `Definition` must be unique.
 
 ---
 
 ## **4. Domain Services**
 
-The Word domain primarily **interacts** with external services (like **Word Lookup**) and internal services (like **Saved Words**) via domain services.
+### Key Operations
 
----
-
-### **4.1 Word Factory**
-
-A `WordFactory` service may be introduced to encapsulate logic for creating `Word` aggregates. It may:
-
-- Build `Word` objects from external sources (like Wiktionary).
-- Populate a `Word` with enriched data (e.g., synonyms, antonyms).
-
----
-
-### **4.2 Key Operations**
-
-#### 1. Add a New Definition
+#### 1. Add New Definition
 
 ```go
 func (w *Word) AddDefinition(def Definition) error {
-    if w.HasDuplicateDefinition(def) {
-        return errors.New("duplicate definition")
+  // Prevent duplicate definitions
+  for _, existing := range w.Definitions {
+    if existing.Text == def.Text {
+      return errors.New("duplicate definition")
     }
-    w.Definitions = append(w.Definitions, def)
-    w.UpdatedAt = time.Now()
-    return nil
+  }
+  w.Definitions = append(w.Definitions, def)
+  w.UpdateEnrichmentStatus()
 }
 ```
 
-#### 2. Enrich Synonyms
+#### 2. Merge Translations
 
 ```go
-func (w *Word) AddSynonyms(newSynonyms []string) {
-    for _, synonym := range newSynonyms {
-        if !w.HasSynonym(synonym) {
-            w.Synonyms = append(w.Synonyms, synonym)
-        }
-    }
-    w.UpdatedAt = time.Now()
+func (w *Word) MergeTranslations(newTranslations map[string][]string) {
+  for lang, words := range newTranslations {
+    w.Translations[lang] = mergeUnique(w.Translations[lang], words)
+  }
 }
 ```
 
@@ -244,35 +237,21 @@ func (w *Word) AddSynonyms(newSynonyms []string) {
 
 ## **5. Relationships with Other Domains**
 
-1. **Word Lookup**:
-   - **Purpose**: The Word Lookup service supplies external vocabulary data to the Word domain.
-   - **Interaction**:
-     - The **Anti-Corruption Layer (ACL)** converts external data into `Word` domain objects.
-     - For example, raw data from Wiktionary is normalized and passed into the Word Factory or directly into the domain's repository.
-
-2. **Word Saving and Management**:
-   - The `SavedWord` entity (from the **Word Saving domain**) references the `Word` entity, enabling users to save and organize specific vocabulary items.
-
-3. **Quizzing and Gamification** (Future):
-   - The Word domain integrates with features like spaced-repetition algorithms and quizzes to provide a personalized learning experience.
+1. **Word Lookup** supplies external data to this domain for creation/enrichment.
+2. **Saved Word**: Enables persisting user-saved words.
 
 ---
 
 ## **6. Persistence**
 
-### Tables
-
-| Table        | Description                                           |
-|--------------|-------------------------------------------------------|
-| `words`      | Stores `Word` metadata (ID, text, language, etc.).    |
-| `definitions`| Stores definitions linked to the `Word` entity.       |
+| Table        | Properties                                                               |
+|--------------|--------------------------------------------------------------------------|
+| `words`      | `id`, `text`, `language`, `created_at`, `updated_at`                     |
+| `definitions`| `id`, `word_id`, `text`, `word_type`, `examples`, `created_at`, `updated_at`|
 
 ---
 
 ## **7. Future Considerations**
 
-1. **Data Enrichment**:
-   - Enable user-provided examples or definitions to supplement the data.
-
-2. **Contextual Word Relationships**:
-   - Relate words through tree-like relationships (e.g., "run" → "ran", "running").
+1. **User Contributions**: Community-provided examples and annotations.
+2. **Enrichment Pipelines**: Automate periodic crawling for missing data.

@@ -1,6 +1,6 @@
 # **Word Lookup Documentation**
 
-**Table of Contents**
+**Table of Contents**  
 
 - [**Word Lookup Documentation**](#word-lookup-documentation)
   - [**1. Purpose**](#1-purpose)
@@ -14,40 +14,48 @@
   - [**3. Responsibilities**](#3-responsibilities)
     - [**3.1 Fetch Data From External Sources**](#31-fetch-data-from-external-sources)
       - [Expected Response Format (Raw Data)](#expected-response-format-raw-data)
-    - [**3.2 Normalize and Transform Data**](#32-normalize-and-transform-data)
+    - [**3.2 Normalize, Transform, and Enrich Data**](#32-normalize-transform-and-enrich-data)
       - [Example Transformation Workflow](#example-transformation-workflow)
+    - [**3.3 Handling Partial Data**](#33-handling-partial-data)
+      - [Progressive Enrichment Workflow](#progressive-enrichment-workflow)
+      - [Prioritized Field Fetching](#prioritized-field-fetching)
   - [**4. Components \& Services**](#4-components--services)
     - [**4.1 Scraper (Infrastructure Layer)**](#41-scraper-infrastructure-layer)
       - [Example Scraper Output](#example-scraper-output)
     - [**4.2 Anti-Corruption Layer (WiktionaryAdapter)**](#42-anti-corruption-layer-wiktionaryadapter)
-      - [WiktionaryAdapter](#wiktionaryadapter)
+      - [Updated Adapter Behavior for Partial Handling](#updated-adapter-behavior-for-partial-handling)
     - [**4.3 LookupService**](#43-lookupservice)
-      - [Example Methods](#example-methods)
+      - [Updated Example Methods](#updated-example-methods)
   - [**5. Intended Workflow**](#5-intended-workflow)
-    - [Scenario 1: Searching for a Word](#scenario-1-searching-for-a-word)
+    - [Scenario 1: Searching and Creating a Word](#scenario-1-searching-and-creating-a-word)
+    - [Scenario 2: Enriching Partial Fields](#scenario-2-enriching-partial-fields)
   - [**6. Error Handling**](#6-error-handling)
+    - [Graceful Partial Returns](#graceful-partial-returns)
   - [**7. Future Extensions**](#7-future-extensions)
     - [A. Multi-Source Lookup](#a-multi-source-lookup)
     - [B. Caching](#b-caching)
   - [**8. Summary**](#8-summary)
 
+---
+
 ## **1. Purpose**
 
 ### Overview
 
-The **Word Lookup Service** is a supporting service responsible for **fetching, normalizing, and enriching vocabulary data**. It acts as a **translator or adapter** between external sources (e.g., Wiktionary, other APIs) and the **Word Domain**. Its primary responsibility is to supply normalized, domain-ready data that aligns with the structure of the `Word` aggregate.
+The **Word Lookup Service** is a supporting service responsible for **fetching, normalizing, and enriching vocabulary data**, even when only partial data is available. It acts as a **translator or adapter** between external systems (e.g., Wiktionary, other APIs) and the **Word Domain**.
 
 ### Core Functions
 
 1. Query **external sources** to retrieve raw data about a word.
-2. Transform and normalize the raw data into a **domain-specific format**.
-3. Serve as an **Anti-Corruption Layer** (ACL) to isolate the domain from external API changes.
-4. Enrich existing `Word` data with new information (e.g., adding synonyms, definitions, translations).
+2. Transform and normalize the raw data into a **domain-specific format** while handling incomplete data.
+3. Support **progressive enrichment** of `Word` objects by focusing on missing fields identified through `EnrichmentStatus`.
+4. Continue to serve as an **Anti-Corruption Layer** (ACL) to hide external schema differences.
 
 ### Why Word Lookup Exists
 
-- The domain (Word Aggregate) should remain **pure and unaware of external data sources or integration concerns**.
-- The Word Domain only works with **complete, validated `Word` aggregates**, which the Word Lookup Service helps generate.
+- **Domain Purity**: The `Word` aggregate in the domain should remain decoupled from external source schemas.
+- **Data Normalization**: The Word Lookup Service processes and enriches the data into consistent, domain-ready objects.
+- **Progressive Enrichment**: Supports iterative updates to vocabulary data when only partial data is returned or available during subsequent lookups.
 
 ---
 
@@ -57,44 +65,42 @@ The **Word Lookup Service** is a supporting service responsible for **fetching, 
 
 The Word Lookup Service interfaces between:
 
-- The **Word Domain**, where the business logic resides, and
-- The **Infrastructure Layer**, where external source integration occurs (e.g., scraping Wiktionary).
+- **The Word Domain**, which manages the business logic.
+- **The Infrastructure Layer**, which interacts directly with external systems.
 
 #### Diagram
 
 ```
 +------------------------+
-|      Word Domain       | <-- Validated Word Objects
+|      Word Domain       | <-- Validated Domain `Word` Objects
 +------------------------+
              ^
              |
    +-------------------+
-   | Word Lookup Layer | <-- Fetch/Translate Raw Data
+   | Word Lookup Layer | <-- Fetch/Normalize Raw Data
    +-------------------+
              ^
              |
 +----------------------------+
-| External Sources (e.g. API)|
+| External Systems (e.g. API)|
 +----------------------------+
 ```
 
 ### Integration Goal
 
-- **Domain-Ready Data**: The Word Lookup Service transforms **raw external data** into normalized aggregates (`Word`) usable by the domain.
-- **Domain Independence**: The `Word` Aggregate is isolated from the schema and inconsistencies of external systems.
+- **Progressive Fetching**: Fetch and enrich `Word` objects incrementally, especially for missing fields like translations, examples, or synonyms.
+- **Domain Isolation**: The `Word` aggregate remains insulated from schema differences in external data.
 
 ---
 
 ## **3. Responsibilities**
 
-The Word Lookup Service fulfills two key responsibilities:
-
 ### **3.1 Fetch Data From External Sources**
 
-The Word Lookup fetches raw word-related data through:
+The Word Lookup Service fetches raw word-related data. These sources include:
 
-- **Scrapers**: For example, extracting definitions and metadata from Wiktionary HTML pages.
-- **APIs**: Using REST or GraphQL APIs from dictionary or language services (if integrated in future phases).
+- **Scrapers**: Extracting data from Wiktionary HTML pages or similar.
+- **APIs**: Querying public dictionary services.
 
 #### Expected Response Format (Raw Data)
 
@@ -119,19 +125,39 @@ The Word Lookup fetches raw word-related data through:
 
 ---
 
-### **3.2 Normalize and Transform Data**
+### **3.2 Normalize, Transform, and Enrich Data**
 
-Once raw data is fetched, the Word Lookup Service transforms it into a structure matching the **Word Aggregate** in the domain:
-
-- **Translate raw schemas into domain concepts** (e.g., turn Wiktionary's "type" field into the domain-relevant `WordType` entity).
-- **Fill in missing details** through enrichment or defaults.
-- **Validate raw data** to ensure it meets domain constraints before passing it to the Word Domain.
+Once raw data is fetched, it is transformed into `domain.Word` objects. New behavior is added to support **partial updates** and enrichment workflows.
 
 #### Example Transformation Workflow
 
-- Wiktionary "nom" → Domain `WordType: "noun"`.
-- Merge multiple synonyms from scraped data into a clean list of unique synonyms.
-- Normalize translations into a consistent `map[string][]string`.
+1. Wiktionary raw type "nom" → Domain `WordType = "noun"`.
+2. Missing translations marked as incomplete in `EnrichmentStatus`.
+3. Merge synonyms from scraped data into existing Word records.
+
+---
+
+### **3.3 Handling Partial Data**
+
+#### Progressive Enrichment Workflow
+
+- First, existing `EnrichmentStatus` is checked.
+- If specific fields (e.g., translations) are incomplete:
+  - Lookup requests **fetch missing data only** from external sources.
+  - Merge data with the existing domain object in the Word domain.
+
+#### Prioritized Field Fetching
+
+The Lookup Service focuses on **missing or incomplete fields**, moving through priorities (definitions > translations > synonyms) as requested.
+
+Example Enrichment Call:
+
+```go
+func (s *LookupService) EnrichMissingFields(
+    wordID string,
+    enrichment EnrichmentStatus,
+) (domain.Word, error)
+```
 
 ---
 
@@ -165,63 +191,34 @@ The Scraper is the lowest-level component responsible for communicating with an 
 
 ### **4.2 Anti-Corruption Layer (WiktionaryAdapter)**
 
-A **translator** that serves as an Anti-Corruption Layer (ACL), bridging the raw scraper data with domain logic. It serves to:
+#### Updated Adapter Behavior for Partial Handling
 
-1. Handle **schema mismatches**: If Wiktionary or other APIs change formats, the adapter hides these changes from the domain.
-2. Normalize multi-source inputs into domain-ready objects (`domain.Word`).
-
-#### WiktionaryAdapter
-
-```go
-type WiktionaryAdapter struct {
-    scraper Scraper
-}
-
-func (w *WiktionaryAdapter) FetchAndTransformWord(text string, language string) (domain.Word, error) {
-    rawResponse, err := w.scraper.FetchFromWiktionary(text, language)
-    if err != nil {
-        return domain.Word{}, err
-    }
-
-    definitions := parseDefinitions(rawResponse.Definitions)
-    translations := normalizeTranslations(rawResponse.Translations)
-
-    return domain.Word{
-        ID:           generateUUID(),
-        Text:         rawResponse.Word,
-        Language:     rawResponse.Language,
-        Definitions:  definitions,
-        Translations: translations,
-        CreatedAt:    time.Now(),
-        UpdatedAt:    time.Now(),
-    }, nil
-}
-```
+- Check for incomplete fields in `EnrichmentStatus` before processing raw responses.
+- Return updated `Word` objects with only fetched fields.
 
 ---
 
 ### **4.3 LookupService**
 
-The publicly accessible service that interacts with application features like search, quiz creation, or word management:
-
-- Abstracts interactions with the `WiktionaryAdapter`.
-- Provides the main entry point for retrieving and refreshing word data.
-
-#### Example Methods
+#### Updated Example Methods
 
 ```go
 type LookupService struct {
     adapter WiktionaryAdapter
 }
 
-// Retrieves a Word object by fetching or updating from external sources
-func (s *LookupService) GetWord(text string, language string) (domain.Word, error) {
-    return s.adapter.FetchAndTransformWord(text, language)
+// Fetch data for missing fields only
+func (s *LookupService) EnrichMissingFields(
+    wordID string,
+    enrichment EnrichmentStatus,
+) (domain.Word, error) {
+    // Fetch data for incomplete fields only
+    ...
 }
 
-// Refreshes and updates a word (e.g., add missing translations or synonyms)
-func (s *LookupService) RefreshWord(wordID string) (domain.Word, error) {
-    // Fetch new data and merge with existing domain data
+// Full word fetch (creates new Words without enrichment context)
+func (s *LookupService) GetWord(text string, language string) (domain.Word, error) {
+    return s.adapter.FetchAndTransformWord(text, language)
 }
 ```
 
@@ -229,24 +226,30 @@ func (s *LookupService) RefreshWord(wordID string) (domain.Word, error) {
 
 ## **5. Intended Workflow**
 
-### Scenario 1: Searching for a Word
+### Scenario 1: Searching and Creating a Word
 
-1. A user searches for **marécage**.
-2. **LookupService** receives the input and queries the database:
-   - If the word exists, the `Word` object is returned.
-   - If not, the **adapter** fetches it from the external source.
-3. Scraper retrieves raw data from Wiktionary.
-4. The Adapter translates `WiktionaryResponse` into a `domain.Word`.
-5. The LookupService stores and returns the new domain `Word`.
+1. User searches for "marécage."
+2. `LookupService` fetches data and returns a **partial Word**, marking missing fields in `EnrichmentStatus`.
+
+---
+
+### Scenario 2: Enriching Partial Fields
+
+1. System checks `EnrichmentStatus` metadata:
+   - Missing translations trigger further Lookup requests.
+2. The updated Word object merges new translations, maintaining consistency.
 
 ---
 
 ## **6. Error Handling**
 
-- **Missing Data**: If external sources don’t have enough data for a word:
-  - Return a partial `Word` object with missing fields (e.g., no synonyms).
-- **API Failures**: Raise retry jobs for temporary external system failures.
-- **Invalid Data**: Raise errors if domain invariants (e.g., unique definitions) are violated.
+### Graceful Partial Returns
+
+- If external systems fail to supply complete data, the Lookup Service:
+  - Returns valid but incomplete Word objects.
+  - Fills `EnrichmentStatus` to track missing data.
+  -  **API Failures**: Raise retry jobs for temporary external system failures.
+  - **Invalid Data**: Raise errors if domain invariants (e.g., unique definitions) are violated.
 
 ---
 
