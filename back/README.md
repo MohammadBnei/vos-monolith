@@ -5,6 +5,7 @@ This directory contains the OpenAPI/Swagger specifications for the Voc on Steroi
 ## Overview
 
 The API provides endpoints for:
+
 - Searching for words
 - Retrieving recent words
 - Health checking
