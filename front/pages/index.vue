@@ -1,12 +1,9 @@
 <template>
-    <div class="container mx-auto p-8">
-      <h1 class="text-4xl font-bold mb-6 text-center">Recherche API</h1>
+    <div class="flex flex-col justify-center items-center min-h-screen bg-white">
       <SearchBar @search="searchData" />
   
-      <div v-if="data" class="mt-6">
-        <h2 class="text-2xl font-semibold">Résultat :</h2>
-        <p class="mt-2 text-lg"><strong>Mot : </strong>{{ data.word }}</p>
-        <p class="mt-2 text-lg"><strong>Définition : </strong>{{ data.word.definitions }}</p>
+      <div v-if="data" class="p-6 bg-gray-100 rounded-lg shadow-lg mt-6 w-96">
+        <p><strong>Definition : </strong>{{ data.word.definitions[0].text }}</p>
       </div>
   
       <div v-if="error" class="error mt-4 text-red-500">
@@ -25,13 +22,12 @@
     if (!searchTerm) return;
   
     try {
-      // Appel API
       const response = await $fetch('/api/search', {
         method: 'POST',
         body: { text: searchTerm, language: 'fr' },
       });
   
-      data.value = response;  // Stocke le résultat dans `data`
+      data.value = response;
     } catch (err) {
       error.value = 'Une erreur est survenue lors de la recherche';
     }

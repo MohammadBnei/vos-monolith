@@ -1,16 +1,16 @@
 <template>
-    <div class="flex flex-col items-center p-4">
-      <input
+   <div class="flex items-center gap-2">
+        <input
         v-model="searchTerm"
         placeholder="Entrez votre recherche"
-        class="p-2 border border-gray-300 rounded-lg w-64 mb-4"
+        class="input"
         @input="onInput"
       >
       <button
-        class="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-700"
+        class= "btn"
         @click="search"
-      >
-        Rechercher
+      > 
+      Search
       </button>
     </div>
   </template>
