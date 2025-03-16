@@ -1,32 +1,29 @@
 <template>
-   <div class="flex items-center gap-2">
-        <input
+    <form class="flex items-center gap-2" @submit.prevent="search">
+      <input
         v-model="searchTerm"
-        placeholder="Entrez votre recherche"
-        class="input"
-        @input="onInput"
+        placeholder="Research a word"
+        class="input px-4 py-2 border rounded-lg"
       >
-      <button
-        class= "btn"
-        @click="search"
-      > 
-      Search
+        <button type="submit" class="btn px-4 py-2 text-grey rounded-lg">
+        Search
       </button>
-    </div>
+    </form>
   </template>
   
   <script setup lang="ts">
   import { ref } from 'vue';
   
   const emit = defineEmits<{
-    (event: 'search', searchTerm: string): void;
+    (event: 'search', searchTerm: string, language: string): void;
   }>();
   
   const searchTerm = ref('');
+  const language = ref('fr');
   
   const search = () => {
-    if (searchTerm.value) {
-      emit('search', searchTerm.value); 
+    if (searchTerm.value.trim()) {
+      emit('search', searchTerm.value.trim(), language.value);
     }
   };
   </script>
