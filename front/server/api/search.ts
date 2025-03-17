@@ -1,4 +1,4 @@
-export default defineEventHandler(async (event: Event) => {
+export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event);
   const body = await readBody(event);
 
@@ -14,13 +14,8 @@ export default defineEventHandler(async (event: Event) => {
 
     return result;
   } catch (err) {
-    if (err.response && err.response.status === 404) {
-      return {
-        error: "Word not found",
-      };
-    }
     return {
-      error: "An unexpected error occurred",
+      error: err,
     };
   }
 });
