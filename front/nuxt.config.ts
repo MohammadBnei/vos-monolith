@@ -16,6 +16,7 @@ export default defineNuxtConfig({
     "@nuxt/image",
     "@nuxt/ui",
     "@nuxt/scripts",
+    "@nuxtjs/storybook",
   ],
   runtimeConfig: {
     public: {
