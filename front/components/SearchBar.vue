@@ -1,6 +1,5 @@
 <template>
   <div class="flex justify-center items-center min-h-screen">
-    <!-- Barre de recherche centrée initialement -->
     <div 
       :class="{
         'absolute left-8 top-1/2 transform -translate-y-1/2 w-96 p-4': !data,
