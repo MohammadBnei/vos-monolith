@@ -1,14 +1,14 @@
-import type { StorybookConfig } from '@storybook-vue/nuxt';
+import type { StorybookConfig } from '@storybook-vue/nuxt'
 
 const config: StorybookConfig = {
-  "stories": [
-    "../components/**/*.mdx",
-    "../components/**/*.stories.@(js|jsx|ts|tsx|mdx)"
+  stories: [
+    '../components/**/*.mdx',
+    '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   ],
-  "addons": [
-    "@storybook/addon-essentials",
-    "@chromatic-com/storybook",
-    "@storybook/experimental-addon-test",
+  addons: [
+    '@storybook/addon-essentials',
+    '@chromatic-com/storybook',
+    '@storybook/experimental-addon-test',
     {
       name: '@storybook/addon-postcss',
       options: {
@@ -19,9 +19,9 @@ const config: StorybookConfig = {
       },
     },
   ],
-  "framework": {
-    "name": "@storybook-vue/nuxt",
-    "options": {}
-  }
-};
-export default config;
+  framework: {
+    name: '@storybook-vue/nuxt',
+    options: {},
+  },
+}
+export default config

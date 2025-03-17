@@ -57,4 +57,7 @@ We use eslint for linting and formating. You should install the [ESlint extentio
   "eslint.format.enable": true,
   "editor.defaultFormatter": "dbaeumer.vscode-eslint",
   "prettier.enable": false,
+  "eslint.options": {
+    "overrideConfigFile": "eslint.config.mjs"
+  },
 ```
