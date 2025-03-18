@@ -61,6 +61,14 @@ func (m *MockRepository) FindByID(ctx context.Context, id string) (*Word, error)
 	return args.Get(0).(*Word), args.Error(1)
 }
 
+func (m *MockRepository) FindSuggestions(ctx context.Context, prefix, language string, limit int) ([]string, error) {
+	args := m.Called(ctx, prefix, language, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
 // MockDictionaryAPI is a mock implementation of the DictionaryAPI interface
 type MockDictionaryAPI struct {
 	mock.Mock
