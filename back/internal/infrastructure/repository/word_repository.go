@@ -55,6 +55,7 @@ func (r *WordRepository) FindByID(ctx context.Context, id string) (*word.Word, e
 	var synonyms []string
 	var antonyms []string
 	var usageNotes []string
+	var pronunciation string
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&w.ID,
@@ -68,6 +69,7 @@ func (r *WordRepository) FindByID(ctx context.Context, id string) (*word.Word, e
 		&searchTerms,
 		&w.Lemma,
 		&usageNotes,
+		&pronunciation,
 		&w.CreatedAt,
 		&w.UpdatedAt,
 	)
