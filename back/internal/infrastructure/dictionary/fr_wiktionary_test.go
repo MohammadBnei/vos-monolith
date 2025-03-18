@@ -446,12 +446,12 @@ func TestWord_EntityMethods(t *testing.T) {
 	// Test AddDefinition
 	def := wordDomain.NewDefinition()
 	def.Text = "A test definition"
-	def.WordType = "nom"
-	def.Examples = []string{"This is a test example"}
-	def.Gender = "masculine"
-	def.Pronunciation = "/tɛst/"
-	def.LanguageSpecifics = map[string]string{"plural": "tests"}
-	def.Notes = []string{"This is a test note"}
+	def.SetWordType("nom")
+	def.AddExample("This is a test example")
+	def.SetGender("masculine")
+	def.SetPronunciation("/tɛst/")
+	def.AddLanguageSpecific("plural", "tests")
+	def.AddNote("This is a test note")
 
 	word.AddDefinition(def)
 	assert.Len(t, word.Definitions, 1)
@@ -517,22 +517,22 @@ func TestWord_EntityMethods(t *testing.T) {
 
 	// Test ValidateDefinition with valid values
 	validDef := wordDomain.NewDefinition()
-	validDef.WordType = "nom"
-	validDef.Gender = "féminin" // Use a valid gender for French
+	validDef.SetWordType("nom")
+	validDef.SetGender("féminin") // Use a valid gender for French
 	err := word.ValidateDefinition(validDef)
 	assert.NoError(t, err)
 
 	// Test with invalid word type
 	invalidTypeDef := wordDomain.NewDefinition()
-	invalidTypeDef.WordType = "invalid_type"
+	invalidTypeDef.SetWordType("invalid_type")
 	err = word.ValidateDefinition(invalidTypeDef)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, wordDomain.ErrInvalidWordType)
 
 	// Test with invalid gender
 	invalidGenderDef := wordDomain.NewDefinition()
-	invalidGenderDef.WordType = "nom" // Set a valid word type
-	invalidGenderDef.Gender = "invalid_gender"
+	invalidGenderDef.SetWordType("nom") // Set a valid word type
+	invalidGenderDef.SetGender("invalid_gender")
 	err = word.ValidateDefinition(invalidGenderDef)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, wordDomain.ErrInvalidGender)
