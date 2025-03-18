@@ -100,25 +100,6 @@ func TestFrenchWiktionaryAPI_FetchWord_ContextCancellation(t *testing.T) {
 }
 
 func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte("<html><body></body></html>"))
-	}))
-	defer server.Close()
-
-	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
-	api := NewFrenchWiktionaryAPI(logger)
-	api.getBaseURL = func() string {
-		return server.URL
-	}
-
-	word, err := api.FetchWord(context.Background(), "test", "fr")
-	assert.Error(t, err)
-	assert.Nil(t, word)
-	assert.ErrorIs(t, err, wordDomain.ErrWordNotFound)
-}
-
-func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
 	// Create a test server that returns empty HTML
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -130,15 +111,15 @@ func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
 	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 
 	// Create a French Wiktionary API with a custom getBaseURL function
-	api := NewFrenchWiktionaryAPI(logger)
+	api := NewFrenchWiktionaryScraper(logger)
 	api.getBaseURL = func() string {
 		return server.URL
 	}
 
 	// Fetch the word - should return error because no definitions found
-	_, err := api.FetchWord(context.Background(), "test", "fr")
+	_, err := api.FetchWordData(context.Background(), "test", "fr")
 	assert.Error(t, err, "Should return error for empty HTML")
-	assert.Contains(t, err.Error(), "word not found", "Error should be about word not found")
+	assert.Contains(t, err.Error(), "no French section found", "Error should be about word not found")
 	assert.ErrorIs(t, err, wordDomain.ErrWordNotFound, "Error should be ErrWordNotFound")
 }
 
