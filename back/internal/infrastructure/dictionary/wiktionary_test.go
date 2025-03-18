@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"voconsteroid/internal/domain/word"
+	wordDomain "voconsteroid/internal/domain/word"
 	"voconsteroid/internal/infrastructure/dictionary/acl"
 )
 
