@@ -71,7 +71,7 @@ func TestFrenchWiktionaryScraper_FetchWord_ErrorCases(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			word, err := api.FetchWord(context.Background(), tc.word, tc.language)
+			word, err := api.FetchWordData(context.Background(), tc.word, tc.language)
 			assert.Error(t, err)
 			assert.Nil(t, word)
 			assert.ErrorIs(t, err, tc.expectedErr)
@@ -85,7 +85,7 @@ func TestFrenchWiktionaryScraper_FetchWord_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	word, err := api.FetchWord(ctx, "maison", "fr")
+	word, err := api.FetchWordData(ctx, "maison", "fr")
 	assert.Error(t, err)
 	assert.Nil(t, word)
 	assert.Contains(t, err.Error(), "context canceled")
@@ -159,7 +159,7 @@ func TestFrenchWiktionaryScraper_FetchRelatedWords_ContextCancellation(t *testin
 	cancel() // Cancel immediately
 
 	// Test the FetchRelatedWords method with a cancelled context
-	_, err := api.FetchRelatedWords(ctx, testWord)
+	_, err := api.FetchRelatedWordsData(ctx, testWord)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "context canceled")
 }
