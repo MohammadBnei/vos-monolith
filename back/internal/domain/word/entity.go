@@ -9,8 +9,15 @@ import (
 	"voconsteroid/internal/domain/word/languages/french"
 )
 
+// Translation represents a value object for storing translations in a target language
+type Translation struct {
+	Language string   `json:"language"` // ISO 639-1 code
+	Terms    []string `json:"terms"`    // List of translated terms
+}
+
 // Definition represents a single definition with its type and examples
 type Definition struct {
+	ID                string            `json:"id"`
 	Text              string            `json:"text"`
 	WordType          string            `json:"word_type,omitempty"` // noun, verb, adjective, etc.
 	Examples          []string          `json:"examples,omitempty"`
@@ -24,19 +31,20 @@ type Definition struct {
 
 // Word represents a vocabulary word with its definitions and metadata
 type Word struct {
-	ID           string            `json:"id"`
-	Text         string            `json:"text"` // The canonical form
-	Language     string            `json:"language"`
-	Definitions  []Definition      `json:"definitions,omitempty"`
-	Etymology    string            `json:"etymology,omitempty"`
-	Translations map[string]string `json:"translations,omitempty"`
-	Synonyms     []string          `json:"synonyms,omitempty"`
-	Antonyms     []string          `json:"antonyms,omitempty"`
-	SearchTerms  []string          `json:"search_terms,omitempty"` // All searchable forms of the word
-	Lemma        string            `json:"lemma,omitempty"`        // Base form of the word
-	UsageNotes   []string          `json:"usage_notes,omitempty"`  // General usage information
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at"`
+	ID           string              `json:"id"`
+	Text         string              `json:"text"` // The canonical form
+	Language     string              `json:"language"`
+	Definitions  []Definition        `json:"definitions,omitempty"`
+	Pronunciation string             `json:"pronunciation,omitempty"` // Word-level pronunciation
+	Etymology    string              `json:"etymology,omitempty"`
+	Translations map[string][]string `json:"translations,omitempty"` // Map of language codes to lists of translated terms
+	Synonyms     []string            `json:"synonyms,omitempty"`
+	Antonyms     []string            `json:"antonyms,omitempty"`
+	SearchTerms  []string            `json:"search_terms,omitempty"` // All searchable forms of the word
+	Lemma        string              `json:"lemma,omitempty"`        // Base form of the word
+	UsageNotes   []string            `json:"usage_notes,omitempty"`  // General usage information
+	CreatedAt    time.Time           `json:"created_at"`
+	UpdatedAt    time.Time           `json:"updated_at"`
 }
 
 // NewWord creates a new Word entity
@@ -50,7 +58,7 @@ func NewWord(text, language string) *Word {
 		Definitions:  []Definition{},
 		Synonyms:     []string{},
 		Antonyms:     []string{},
-		Translations: make(map[string]string),
+		Translations: make(map[string][]string),
 		SearchTerms:  []string{text}, // Initialize with the main text as a search term
 		UsageNotes:   []string{},
 		CreatedAt:    now,
@@ -60,10 +68,22 @@ func NewWord(text, language string) *Word {
 
 // NewDefinition returns a new, empty Definition structure.
 func NewDefinition() Definition {
+	now := time.Now()
 	return Definition{
+		ID:                uuid.New().String(),
 		Examples:          []string{},
 		LanguageSpecifics: make(map[string]string),
 		Notes:             []string{},
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+}
+
+// NewTranslation creates a new Translation value object
+func NewTranslation(language string, terms []string) Translation {
+	return Translation{
+		Language: language,
+		Terms:    terms,
 	}
 }
 
@@ -89,6 +109,13 @@ func (w *Word) SetLemma(lemma string) {
 
 // AddDefinition adds a new definition to the word
 func (w *Word) AddDefinition(definition Definition) {
+	// Ensure the definition has an ID
+	if definition.ID == "" {
+		definition.ID = uuid.New().String()
+		definition.CreatedAt = time.Now()
+		definition.UpdatedAt = time.Now()
+	}
+	
 	w.Definitions = append(w.Definitions, definition)
 
 	// Update the search terms
@@ -137,6 +164,34 @@ func (w *Word) AddAntonym(antonym string) {
 	}
 
 	w.Antonyms = append(w.Antonyms, antonym)
+	w.UpdatedAt = time.Now()
+}
+
+// AddTranslation adds a translation term to the specified language
+func (w *Word) AddTranslation(language string, term string) {
+	// Check if we already have translations for this language
+	terms, exists := w.Translations[language]
+	
+	if !exists {
+		// Create a new entry for this language
+		w.Translations[language] = []string{term}
+	} else {
+		// Check if the term already exists
+		for _, existingTerm := range terms {
+			if existingTerm == term {
+				return // Term already exists, no need to add
+			}
+		}
+		// Add the new term
+		w.Translations[language] = append(terms, term)
+	}
+	
+	w.UpdatedAt = time.Now()
+}
+
+// SetPronunciation sets the word-level pronunciation
+func (w *Word) SetPronunciation(pronunciation string) {
+	w.Pronunciation = pronunciation
 	w.UpdatedAt = time.Now()
 }
 
