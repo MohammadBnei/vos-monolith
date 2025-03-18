@@ -725,7 +725,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 						if langName != "" && translationText != "" {
 							w.logger.Debug().Str("language", langCode).Str("translation", translationText).Msg("Found translation")
-							newWord.Translations[langCode] = translationText
+							newWord.Translations[langCode] = append(newWord.Translations[langCode], translationText)
 						}
 					})
 				}
