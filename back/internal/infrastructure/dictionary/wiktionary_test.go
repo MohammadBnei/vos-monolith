@@ -71,8 +71,6 @@ func TestWiktionaryAPI_FetchWord_SupportedLanguage(t *testing.T) {
 
 	// Replace the scraper with a mock
 	mockScraper := new(MockWiktionaryScraper)
-	api.lookupServices["fr"].scraper = mockScraper
-	api.lookupServices["fr"].Adapter().logger = logger // need to set logger
 
 	// Setup expectations
 	expectedResponse := &acl.WiktionaryResponse{
@@ -115,8 +113,6 @@ func TestWiktionaryAPI_FetchRelatedWords_SupportedLanguage(t *testing.T) {
 
 	// Replace the scraper with a mock
 	mockScraper := new(MockWiktionaryScraper)
-	api.lookupServices["fr"].scraper = mockScraper
-	api.lookupServices["fr"].Adapter().logger = logger // need to set logger
 
 	// Setup expectations
 	sourceWord := "bonjour"
@@ -169,8 +165,6 @@ func TestWiktionaryAPI_FetchSuggestions_SupportedLanguage(t *testing.T) {
 
 	// Replace the scraper with a mock
 	mockScraper := new(MockWiktionaryScraper)
-	api.lookupServices["fr"].adapter = &acl.WiktionaryAdapter{logger: logger} // need to set adapter
-	api.lookupServices["fr"].scraper = mockScraper
 
 	// Setup expectations
 	expectedSuggestions := []string{"test1", "test2"}
