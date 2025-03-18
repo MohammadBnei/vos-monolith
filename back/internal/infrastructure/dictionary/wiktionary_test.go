@@ -60,7 +60,6 @@ func TestNewWiktionaryAPI(t *testing.T) {
 
 	// Assert
 	assert.NotNil(t, api)
-	assert.NotNil(t, api.scrapers)
 	assert.NotNil(t, api.lookupServices["fr"]) // French lookup service should be registered
 }
 
@@ -78,6 +77,9 @@ func TestWiktionaryAPI_FetchWord_SupportedLanguage(t *testing.T) {
 		Language: "fr",
 	}
 	mockScraper.On("FetchWordData", mock.Anything, "bonjour", "fr").Return(expectedResponse, nil)
+
+	// Register the mock scraper
+	api.lookupServices["fr"] = acl.NewLookupService(api.adapter, mockScraper, logger)
 
 	// Execute
 	ctx := context.Background()
@@ -125,6 +127,9 @@ func TestWiktionaryAPI_FetchRelatedWords_SupportedLanguage(t *testing.T) {
 	}
 	mockScraper.On("FetchRelatedWordsData", mock.Anything, sourceWord, language).Return(expectedResponse, nil)
 
+	// Register the mock scraper
+	api.lookupServices["fr"] = acl.NewLookupService(api.adapter, mockScraper, logger)
+
 	// Execute
 	word := wordDomain.NewWord(sourceWord, language)
 	ctx := context.Background()
@@ -165,6 +170,7 @@ func TestWiktionaryAPI_FetchSuggestions_SupportedLanguage(t *testing.T) {
 
 	// Replace the scraper with a mock
 	mockScraper := new(MockWiktionaryScraper)
+	api.lookupServices["fr"] = acl.NewLookupService(api.adapter, mockScraper, logger)
 
 	// Setup expectations
 	expectedSuggestions := []string{"test1", "test2"}

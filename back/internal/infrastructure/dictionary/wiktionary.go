@@ -14,8 +14,6 @@ import (
 // It acts as a router to language-specific scrapers and uses the ACL pattern
 type WiktionaryAPI struct {
 	logger         zerolog.Logger
-	// Map of language-specific scrapers
-	scrapers       map[string]acl.WiktionaryScraper
 	// Adapter for transforming data
 	adapter        *acl.WiktionaryAdapter
 	// Lookup services for each language
@@ -32,14 +30,12 @@ func NewWiktionaryAPI(logger zerolog.Logger) *WiktionaryAPI {
 	// Create the API instance
 	api := &WiktionaryAPI{
 		logger:         baseLogger,
-		scrapers:       make(map[string]acl.WiktionaryScraper),
 		adapter:        adapter,
 		lookupServices: make(map[string]*acl.LookupService),
 	}
 
 	// Register language-specific scrapers
 	frScraper := NewFrenchWiktionaryScraper(baseLogger)
-	api.scrapers["fr"] = frScraper
 	
 	// Create lookup services for each language
 	api.lookupServices["fr"] = acl.NewLookupService(adapter, frScraper, baseLogger)
