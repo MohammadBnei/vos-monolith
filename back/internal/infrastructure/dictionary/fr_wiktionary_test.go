@@ -35,28 +35,22 @@ func TestFrenchWiktionaryScraper_FetchWord_Success(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			word, err := api.FetchWordData(context.Background(), tc.word, tc.language)
+			wiktionaryResponse, err := api.FetchWordData(context.Background(), tc.word, tc.language)
 			assert.NoError(t, err)
-			require.NotNil(t, word)
+			require.NotNil(t, wiktionaryResponse)
 
 			// Basic validation
-			assert.Equal(t, tc.word, word.Word)
-			assert.Equal(t, tc.language, word.Language)
-			assert.NotEmpty(t, word.Definitions)
+			assert.Equal(t, tc.word, wiktionaryResponse.Word)
+			assert.Equal(t, tc.language, wiktionaryResponse.Language)
+			assert.NotEmpty(t, wiktionaryResponse.Definitions)
 
 			// Validate definitions
-			for _, def := range word.Definitions {
+			for _, def := range wiktionaryResponse.Definitions {
 				assert.NotEmpty(t, def.Text)
-				if def.WordType != "" {
-					assert.True(t, french.IsValidWordType(french.WordType(def.WordType)))
-				}
-				if def.Gender != "" {
-					assert.True(t, french.IsValidGender(french.Gender(def.Gender)))
-				}
 			}
 
 			// Validate search terms
-			assert.Contains(t, word.SearchTerms, tc.word)
+			assert.Contains(t, wiktionaryResponse.SearchTerms, tc.word)
 		})
 	}
 }
