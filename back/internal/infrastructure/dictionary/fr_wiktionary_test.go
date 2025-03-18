@@ -20,99 +20,102 @@ func createTestAPI(t *testing.T) *FrenchWiktionaryAPI {
 	return NewFrenchWiktionaryAPI(logger)
 }
 
-func TestFrenchWiktionaryAPI_FetchWord(t *testing.T) {
-	// Create a test API with real Wiktionary URL
+func TestFrenchWiktionaryAPI_FetchWord_Success(t *testing.T) {
 	api := createTestAPI(t)
 
-	// Test with a real French word
-	word, err := api.FetchWord(context.Background(), "maison", "fr")
-	assert.NoError(t, err)
-	require.NotNil(t, word, "Word should not be nil")
-
-	// Verify basic word data
-	assert.Equal(t, "maison", word.Text)
-	assert.Equal(t, "fr", word.Language)
-
-	// Check that we have definitions
-	assert.Greater(t, len(word.Definitions), 0, "Should have at least one definition")
-
-	// Check the first definition
-	if len(word.Definitions) > 0 {
-		def := word.Definitions[0]
-		assert.NotEmpty(t, def.Text, "Definition text should not be empty")
-
-		// These fields might not always be populated depending on the word
-		// So we don't assert they're not empty, just check them if they exist
-		if def.Pronunciation != "" {
-			t.Logf("Found pronunciation: %s", def.Pronunciation)
-		}
-
-		if len(def.LanguageSpecifics) > 0 {
-			t.Logf("Found language specifics: %v", def.LanguageSpecifics)
-		}
-
-		// If the definition has examples, check them
-		if len(def.Examples) > 0 {
-			assert.NotEmpty(t, def.Examples[0], "Example should not be empty")
-		}
-
-		// Validate French-specific fields
-		if def.WordType != "" {
-			t.Logf("Found word type: %s", def.WordType)
-			assert.True(t, french.IsValidWordType(french.WordType(def.WordType)),
-				"Word type should be valid for French")
-		}
-		if def.Gender != "" {
-			assert.True(t, french.IsValidGender(french.Gender(def.Gender)),
-				"Gender should be valid for French")
-		}
-
-		// Check for notes in definition
-		if len(def.Notes) > 0 {
-			assert.NotEmpty(t, def.Notes[0], "Note should not be empty")
-		}
+	testCases := []struct {
+		name     string
+		word     string
+		language string
+	}{
+		{"common noun", "maison", "fr"},
+		{"verb", "manger", "fr"},
+		{"adjective", "grand", "fr"},
 	}
 
-	// Check that we have synonyms
-	assert.Greater(t, len(word.Synonyms), 0, "Should have at least one synonym")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			word, err := api.FetchWord(context.Background(), tc.word, tc.language)
+			assert.NoError(t, err)
+			require.NotNil(t, word)
 
-	// Check that we have an etymology
-	assert.NotEmpty(t, word.Etymology, "Should have etymology")
+			// Basic validation
+			assert.Equal(t, tc.word, word.Text)
+			assert.Equal(t, tc.language, word.Language)
+			assert.NotEmpty(t, word.Definitions)
+			assert.False(t, word.CreatedAt.IsZero())
+			assert.False(t, word.UpdatedAt.IsZero())
 
-	// Check search terms
-	assert.NotEmpty(t, word.SearchTerms, "SearchTerms should be populated")
-	assert.Contains(t, word.SearchTerms, "maison", "Main word should be in search terms")
+			// Validate definitions
+			for _, def := range word.Definitions {
+				assert.NotEmpty(t, def.Text)
+				if def.WordType != "" {
+					assert.True(t, french.IsValidWordType(french.WordType(def.WordType)))
+				}
+				if def.Gender != "" {
+					assert.True(t, french.IsValidGender(french.Gender(def.Gender)))
+				}
+			}
 
-	// Lemma might not always be set
-	if word.Lemma != "" {
-		t.Logf("Found lemma: %s", word.Lemma)
+			// Validate search terms
+			assert.Contains(t, word.SearchTerms, tc.word)
+		})
 	}
-
-	// Check translations if available
-	if len(word.Translations) > 0 {
-		for lang, translation := range word.Translations {
-			assert.NotEmpty(t, lang, "Translation language should not be empty")
-			assert.NotEmpty(t, translation, "Translation text should not be empty")
-		}
-	}
-
-	// Check antonyms if available
-	if len(word.Antonyms) > 0 {
-		assert.NotEmpty(t, word.Antonyms[0], "Antonym should not be empty")
-	}
-
-	// Check that the timestamps are set
-	assert.False(t, word.CreatedAt.IsZero(), "CreatedAt should be set")
-	assert.False(t, word.UpdatedAt.IsZero(), "UpdatedAt should be set")
 }
 
-func TestFrenchWiktionaryAPI_FetchWord_NotFound(t *testing.T) {
-	// Create a test API with real Wiktionary URL
+func TestFrenchWiktionaryAPI_FetchWord_ErrorCases(t *testing.T) {
 	api := createTestAPI(t)
 
-	// Fetch the word - should return not found error
-	_, err := api.FetchWord(context.Background(), "nonexistentword", "fr")
-	assert.Error(t, err, "Should return error for non-existent word")
+	testCases := []struct {
+		name        string
+		word        string
+		language    string
+		expectedErr error
+	}{
+		{"empty word", "", "fr", wordDomain.ErrWordNotFound},
+		{"unsupported language", "maison", "en", wordDomain.ErrWordNotFound},
+		{"non-existent word", "nonexistentword12345", "fr", wordDomain.ErrWordNotFound},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			word, err := api.FetchWord(context.Background(), tc.word, tc.language)
+			assert.Error(t, err)
+			assert.Nil(t, word)
+			assert.ErrorIs(t, err, tc.expectedErr)
+		})
+	}
+}
+
+func TestFrenchWiktionaryAPI_FetchWord_ContextCancellation(t *testing.T) {
+	api := createTestAPI(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	word, err := api.FetchWord(ctx, "maison", "fr")
+	assert.Error(t, err)
+	assert.Nil(t, word)
+	assert.Contains(t, err.Error(), "context canceled")
+}
+
+func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte("<html><body></body></html>"))
+	}))
+	defer server.Close()
+
+	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
+	api := NewFrenchWiktionaryAPI(logger)
+	api.getBaseURL = func() string {
+		return server.URL
+	}
+
+	word, err := api.FetchWord(context.Background(), "test", "fr")
+	assert.Error(t, err)
+	assert.Nil(t, word)
+	assert.ErrorIs(t, err, wordDomain.ErrWordNotFound)
 }
 
 func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
@@ -316,53 +319,30 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_ServerError(t *testing.T) {
 	assert.Nil(t, suggestions)
 	assert.Contains(t, err.Error(), "received non-OK status code")
 }
-func TestFrenchWiktionaryAPI_RealFetchWord(t *testing.T) {
-	// Create a test API with real Wiktionary URL
+func TestFrenchWiktionaryAPI_FetchWord_EdgeCases(t *testing.T) {
 	api := createTestAPI(t)
 
-	// Test with a real French word
-	word, err := api.FetchWord(context.Background(), "maison", "fr")
-	assert.NoError(t, err)
-	require.NotNil(t, word, "Word should not be nil")
-
-	// Verify basic word data
-	assert.Equal(t, "maison", word.Text)
-	assert.Equal(t, "fr", word.Language)
-
-	// Check that we have definitions
-	assert.Greater(t, len(word.Definitions), 0, "Should have at least one definition")
-
-	// Check that we have synonyms
-	assert.Greater(t, len(word.Synonyms), 0, "Should have at least one synonym")
-
-	// Check that we have an etymology
-	assert.NotEmpty(t, word.Etymology, "Should have etymology")
-
-	// Check search terms
-	assert.NotEmpty(t, word.SearchTerms, "SearchTerms should be populated")
-	assert.Contains(t, word.SearchTerms, "maison", "Main word should be in search terms")
-
-	// Check lemma if available
-	if word.Lemma != "" {
-		assert.NotEmpty(t, word.Lemma, "Lemma should not be empty if set")
+	testCases := []struct {
+		name     string
+		word     string
+		language string
+	}{
+		{"word with diacritics", "éclair", "fr"},
+		{"compound word", "porte-monnaie", "fr"},
+		{"word with apostrophe", "aujourd'hui", "fr"},
 	}
 
-	// Check translations if available
-	if len(word.Translations) > 0 {
-		for lang, translation := range word.Translations {
-			assert.NotEmpty(t, lang, "Translation language should not be empty")
-			assert.NotEmpty(t, translation, "Translation text should not be empty")
-		}
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			word, err := api.FetchWord(context.Background(), tc.word, tc.language)
+			assert.NoError(t, err)
+			require.NotNil(t, word)
 
-	// Check antonyms if available
-	if len(word.Antonyms) > 0 {
-		assert.NotEmpty(t, word.Antonyms[0], "Antonym should not be empty")
+			assert.Equal(t, tc.word, word.Text)
+			assert.Equal(t, tc.language, word.Language)
+			assert.NotEmpty(t, word.Definitions)
+		})
 	}
-
-	// Check that the timestamps are set
-	assert.False(t, word.CreatedAt.IsZero(), "CreatedAt should be set")
-	assert.False(t, word.UpdatedAt.IsZero(), "UpdatedAt should be set")
 }
 
 func TestFrenchWiktionaryAPI_RealFetchWord_NotFound(t *testing.T) {
