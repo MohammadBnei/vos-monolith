@@ -42,6 +42,15 @@ func (m *MockWiktionaryScraper) FetchSuggestionsData(ctx context.Context, prefix
 	return args.Get(0).([]string), args.Error(1)
 }
 
+// Helper function to convert []*word.Word to []string for easier comparison
+func convertWordSliceToStringSlice(words []*wordDomain.Word) []string {
+	stringSlice := make([]string, len(words))
+	for i, word := range words {
+		stringSlice[i] = word.Text
+	}
+	return stringSlice
+}
+
 func TestNewWiktionaryAPI(t *testing.T) {
 	// Setup
 	logger := zerolog.New(zerolog.NewTestWriter(t))
@@ -191,13 +200,4 @@ func TestWiktionaryAPI_FetchSuggestions_UnsupportedLanguage(t *testing.T) {
 	assert.Nil(t, result)
 	assert.True(t, errors.Is(err, wordDomain.ErrWordNotFound))
 	assert.Contains(t, err.Error(), "unsupported language en")
-}
-
-// Helper function to convert []*word.Word to []string for easier comparison
-func convertWordSliceToStringSlice(words []*wordDomain.Word) []string {
-	stringSlice := make([]string, len(words))
-	for i, word := range words {
-		stringSlice[i] = word.Text
-	}
-	return stringSlice
 }
