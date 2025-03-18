@@ -313,6 +313,95 @@ func TestGetRecentWords_RepositoryError(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 
+func TestGetRelatedWords(t *testing.T) {
+	tests := []struct {
+		name          string
+		wordID        string
+		sourceWord    *Word
+		repoError     error
+		apiError      error
+		expectedError bool
+	}{
+		{
+			name:   "word with existing relations",
+			wordID: "word1",
+			sourceWord: &Word{
+				ID:       "word1",
+				Text:     "test",
+				Language: "en",
+				Synonyms: []string{"syn1", "syn2"},
+				Antonyms: []string{"ant1"},
+			},
+		},
+		{
+			name:   "word needing API fetch",
+			wordID: "word2",
+			sourceWord: &Word{
+				ID:       "word2",
+				Text:     "test",
+				Language: "en",
+			},
+		},
+		{
+			name:          "word not found",
+			wordID:       "word3",
+			repoError:     ErrWordNotFound,
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			repo, dictAPI, svc := setupTestService(t)
+			ctx := context.Background()
+
+			// Mock repository
+			repo.On("FindByID", ctx, tt.wordID).Return(tt.sourceWord, tt.repoError)
+
+			if tt.sourceWord != nil && len(tt.sourceWord.Synonyms) == 0 && len(tt.sourceWord.Antonyms) == 0 {
+				// Mock API call for related words
+				relatedWords := &RelatedWords{
+					SourceWord: tt.sourceWord,
+					Synonyms: []*Word{
+						{Text: "syn1", Language: "en"},
+						{Text: "syn2", Language: "en"},
+					},
+					Antonyms: []*Word{
+						{Text: "ant1", Language: "en"},
+					},
+				}
+				dictAPI.On("FetchRelatedWords", ctx, tt.sourceWord).Return(relatedWords, tt.apiError)
+				repo.On("Save", ctx, mock.Anything).Return(nil)
+			}
+
+			// Execute
+			result, err := svc.GetRelatedWords(ctx, tt.wordID)
+
+			// Assert
+			if tt.expectedError {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.Equal(t, tt.sourceWord, result.SourceWord)
+
+			if len(tt.sourceWord.Synonyms) > 0 || len(tt.sourceWord.Antonyms) > 0 {
+				assert.Len(t, result.Synonyms, len(tt.sourceWord.Synonyms))
+				assert.Len(t, result.Antonyms, len(tt.sourceWord.Antonyms))
+			} else {
+				assert.Len(t, result.Synonyms, 2)
+				assert.Len(t, result.Antonyms, 1)
+			}
+
+			repo.AssertExpectations(t)
+			dictAPI.AssertExpectations(t)
+		})
+	}
+}
+
 func TestAutoComplete(t *testing.T) {
 	// Setup
 	repo, dictAPI, svc := setupTestService(t)
