@@ -15,12 +15,12 @@ import (
 )
 
 // Helper function to create a test API with real Wiktionary URL
-func createTestAPI(t *testing.T) *FrenchWiktionaryAPI {
+func createTestAPI(t *testing.T) *FrenchWiktionaryScraper {
 	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
-	return NewFrenchWiktionaryAPI(logger)
+	return NewFrenchWiktionaryScraper(logger)
 }
 
-func TestFrenchWiktionaryAPI_FetchWord_Success(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchWord_Success(t *testing.T) {
 	api := createTestAPI(t)
 
 	testCases := []struct {
@@ -35,16 +35,14 @@ func TestFrenchWiktionaryAPI_FetchWord_Success(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			word, err := api.FetchWord(context.Background(), tc.word, tc.language)
+			word, err := api.FetchWordData(context.Background(), tc.word, tc.language)
 			assert.NoError(t, err)
 			require.NotNil(t, word)
 
 			// Basic validation
-			assert.Equal(t, tc.word, word.Text)
+			assert.Equal(t, tc.word, word.Word)
 			assert.Equal(t, tc.language, word.Language)
 			assert.NotEmpty(t, word.Definitions)
-			assert.False(t, word.CreatedAt.IsZero())
-			assert.False(t, word.UpdatedAt.IsZero())
 
 			// Validate definitions
 			for _, def := range word.Definitions {
@@ -63,7 +61,7 @@ func TestFrenchWiktionaryAPI_FetchWord_Success(t *testing.T) {
 	}
 }
 
-func TestFrenchWiktionaryAPI_FetchWord_ErrorCases(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchWord_ErrorCases(t *testing.T) {
 	api := createTestAPI(t)
 
 	testCases := []struct {
@@ -87,7 +85,7 @@ func TestFrenchWiktionaryAPI_FetchWord_ErrorCases(t *testing.T) {
 	}
 }
 
-func TestFrenchWiktionaryAPI_FetchWord_ContextCancellation(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchWord_ContextCancellation(t *testing.T) {
 	api := createTestAPI(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -99,7 +97,7 @@ func TestFrenchWiktionaryAPI_FetchWord_ContextCancellation(t *testing.T) {
 	assert.Contains(t, err.Error(), "context canceled")
 }
 
-func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchWord_EmptyHTML(t *testing.T) {
 	// Create a test server that returns empty HTML
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -123,7 +121,7 @@ func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
 	assert.ErrorIs(t, err, wordDomain.ErrWordNotFound, "Error should be ErrWordNotFound")
 }
 
-// func TestFrenchWiktionaryAPI_FetchRelatedWords(t *testing.T) {
+// func TestFrenchWiktionaryScraper_FetchRelatedWords(t *testing.T) {
 // 	// Create a test API with real Wiktionary URL
 // 	api := createTestAPI(t)
 
@@ -153,7 +151,7 @@ func TestFrenchWiktionaryAPI_FetchWord_EmptyHTML(t *testing.T) {
 // 	assert.Equal(t, "antonym1", relatedWords.Antonyms[0].Text)
 // }
 
-func TestFrenchWiktionaryAPI_FetchRelatedWords_ContextCancellation(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchRelatedWords_ContextCancellation(t *testing.T) {
 	// Create a test API with real Wiktionary URL
 	api := createTestAPI(t)
 
@@ -172,7 +170,7 @@ func TestFrenchWiktionaryAPI_FetchRelatedWords_ContextCancellation(t *testing.T)
 	assert.Contains(t, err.Error(), "context canceled")
 }
 
-func TestFrenchWiktionaryAPI_FetchSuggestions(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchSuggestions(t *testing.T) {
 	// Skip this test in CI environments or when running automated tests
 	if testing.Short() {
 		t.Skip("Skipping test that makes external API calls")
@@ -195,7 +193,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions(t *testing.T) {
 	}
 }
 
-func TestFrenchWiktionaryAPI_FetchSuggestions_UnsupportedLanguage(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchSuggestions_UnsupportedLanguage(t *testing.T) {
 	// Create a test API
 	api := createTestAPI(t)
 
@@ -209,7 +207,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_UnsupportedLanguage(t *testing.T) 
 	assert.Contains(t, err.Error(), "unsupported language en")
 }
 
-func TestFrenchWiktionaryAPI_FetchSuggestions_MockServer(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchSuggestions_MockServer(t *testing.T) {
 	// Create a test server that returns a mock JSON response
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -226,7 +224,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_MockServer(t *testing.T) {
 	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 
 	// Create a French Wiktionary API with a custom HTTP client
-	api := &FrenchWiktionaryAPI{
+	api := &FrenchWiktionaryScraper{
 		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
 		getBaseURL: func() string {
 			return server.URL
@@ -235,7 +233,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_MockServer(t *testing.T) {
 
 	// Test the FetchSuggestions method
 	ctx := context.Background()
-	suggestions, err := api.FetchSuggestions(ctx, "test", "fr")
+	suggestions, err := api.FetchSuggestionsData(ctx, "test", "fr")
 
 	// Assert
 	assert.NoError(t, err)
@@ -244,7 +242,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_MockServer(t *testing.T) {
 	assert.Equal(t, "test2", suggestions[1])
 }
 
-func TestFrenchWiktionaryAPI_FetchSuggestions_InvalidJSON(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchSuggestions_InvalidJSON(t *testing.T) {
 	// Create a test server that returns invalid JSON
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -256,7 +254,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_InvalidJSON(t *testing.T) {
 	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 
 	// Create a French Wiktionary API with a custom HTTP client
-	api := &FrenchWiktionaryAPI{
+	api := &FrenchWiktionaryScraper{
 		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
 		getBaseURL: func() string {
 			return server.URL
@@ -265,7 +263,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_InvalidJSON(t *testing.T) {
 
 	// Test the FetchSuggestions method
 	ctx := context.Background()
-	suggestions, err := api.FetchSuggestions(ctx, "test", "fr")
+	suggestions, err := api.FetchSuggestionsData(ctx, "test", "fr")
 
 	// Assert
 	assert.Error(t, err)
@@ -273,7 +271,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_InvalidJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to decode response")
 }
 
-func TestFrenchWiktionaryAPI_FetchSuggestions_ServerError(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchSuggestions_ServerError(t *testing.T) {
 	// Create a test server that returns a server error
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -284,7 +282,7 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_ServerError(t *testing.T) {
 	logger := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 
 	// Create a French Wiktionary API with a custom HTTP client
-	api := &FrenchWiktionaryAPI{
+	api := &FrenchWiktionaryScraper{
 		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
 		getBaseURL: func() string {
 			return server.URL
@@ -293,14 +291,14 @@ func TestFrenchWiktionaryAPI_FetchSuggestions_ServerError(t *testing.T) {
 
 	// Test the FetchSuggestions method
 	ctx := context.Background()
-	suggestions, err := api.FetchSuggestions(ctx, "test", "fr")
+	suggestions, err := api.FetchSuggestionsData(ctx, "test", "fr")
 
 	// Assert
 	assert.Error(t, err)
 	assert.Nil(t, suggestions)
 	assert.Contains(t, err.Error(), "received non-OK status code")
 }
-func TestFrenchWiktionaryAPI_FetchWord_EdgeCases(t *testing.T) {
+func TestFrenchWiktionaryScraper_FetchWord_EdgeCases(t *testing.T) {
 	api := createTestAPI(t)
 
 	testCases := []struct {
@@ -315,28 +313,28 @@ func TestFrenchWiktionaryAPI_FetchWord_EdgeCases(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			word, err := api.FetchWord(context.Background(), tc.word, tc.language)
+			word, err := api.FetchWordData(context.Background(), tc.word, tc.language)
 			assert.NoError(t, err)
 			require.NotNil(t, word)
 
-			assert.Equal(t, tc.word, word.Text)
+			assert.Equal(t, tc.word, word.Word)
 			assert.Equal(t, tc.language, word.Language)
 			assert.NotEmpty(t, word.Definitions)
 		})
 	}
 }
 
-func TestFrenchWiktionaryAPI_RealFetchWord_NotFound(t *testing.T) {
+func TestFrenchWiktionaryScraper_RealFetchWord_NotFound(t *testing.T) {
 	// Create a test API with real Wiktionary URL
 	api := createTestAPI(t)
 
 	// Test with a non-existent word
-	_, err := api.FetchWord(context.Background(), "nonexistentword12345", "fr")
+	_, err := api.FetchWordData(context.Background(), "nonexistentword12345", "fr")
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, wordDomain.ErrWordNotFound)
 }
-func TestFrenchWiktionaryAPI_DetermineWordType(t *testing.T) {
-	api := &FrenchWiktionaryAPI{}
+func TestFrenchWiktionaryScraper_DetermineWordType(t *testing.T) {
+	api := &FrenchWiktionaryScraper{}
 
 	testCases := []struct {
 		sectionTitle string
@@ -360,8 +358,8 @@ func TestFrenchWiktionaryAPI_DetermineWordType(t *testing.T) {
 		})
 	}
 }
-func TestFrenchWiktionaryAPI_MapLanguageNameToCode(t *testing.T) {
-	api := &FrenchWiktionaryAPI{}
+func TestFrenchWiktionaryScraper_MapLanguageNameToCode(t *testing.T) {
+	api := &FrenchWiktionaryScraper{}
 
 	testCases := []struct {
 		langName string

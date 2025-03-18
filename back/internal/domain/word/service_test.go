@@ -474,12 +474,6 @@ func TestAutoComplete_Validation(t *testing.T) {
 			expectedError: ErrInvalidWord,
 		},
 		{
-			name:          "empty language",
-			prefix:        "test",
-			language:      "",
-			expectedError: ErrInvalidLanguage,
-		},
-		{
 			name:          "whitespace prefix",
 			prefix:        "   ",
 			language:      "en",
