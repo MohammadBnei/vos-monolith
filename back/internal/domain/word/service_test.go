@@ -107,33 +107,65 @@ func setupTestService(t *testing.T) (*MockRepository, *MockDictionaryAPI, Servic
 }
 
 func TestSearch_ExistingWord(t *testing.T) {
-	// Setup
-	repo, dictAPI, svc := setupTestService(t)
-
-	ctx := context.Background()
-	expectedWord := &Word{
-		Text:      "test",
-		Language:  "en",
-		CreatedAt: time.Now(),
+	tests := []struct {
+		name        string
+		text        string
+		language    string
+		expectedWord *Word
+	}{
+		{
+			name: "basic word",
+			text: "test",
+			language: "en",
+			expectedWord: &Word{
+				Text:      "test",
+				Language:  "en",
+				CreatedAt: time.Now(),
+			},
+		},
+		{
+			name: "word with whitespace",
+			text: "  test  ",
+			language: "en",
+			expectedWord: &Word{
+				Text:      "test",
+				Language:  "en",
+				CreatedAt: time.Now(),
+			},
+		},
+		{
+			name: "word with mixed case",
+			text: "TeSt",
+			language: "en",
+			expectedWord: &Word{
+				Text:      "test",
+				Language:  "en",
+				CreatedAt: time.Now(),
+			},
+		},
 	}
 
-	// Expect repository to find the word by text first
-	repo.On("FindByText", ctx, "test", "en").Return(expectedWord, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			repo, dictAPI, svc := setupTestService(t)
+			ctx := context.Background()
 
-	// Add expectation for FindByAnyForm (won't be called but needs to be mocked)
-	repo.On("FindByAnyForm", ctx, "test", "en").Return(nil, errors.New("not found"))
+			// Expect repository to find the word by text first
+			repo.On("FindByText", ctx, tt.expectedWord.Text, tt.language).Return(tt.expectedWord, nil)
+			repo.On("FindByAnyForm", ctx, tt.expectedWord.Text, tt.language).Return(nil, errors.New("not found"))
 
-	// Execute
-	word, err := svc.Search(ctx, "test", "en")
+			// Execute
+			word, err := svc.Search(ctx, tt.text, tt.language)
 
-	// Assert
-	assert.NoError(t, err)
-	assert.Equal(t, expectedWord, word)
-	repo.AssertExpectations(t)
-	dictAPI.AssertNotCalled(t, "FetchWord")
-
-	// Verify that FindByAnyForm was not called since we found the word by text
-	repo.AssertNotCalled(t, "FindByAnyForm")
+			// Assert
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedWord, word)
+			repo.AssertExpectations(t)
+			dictAPI.AssertNotCalled(t, "FetchWord")
+			repo.AssertNotCalled(t, "FindByAnyForm")
+		})
+	}
 }
 
 func TestSearch_NewWord(t *testing.T) {
@@ -317,23 +349,58 @@ func TestAutoComplete(t *testing.T) {
 	dictAPI.AssertExpectations(t)
 }
 
-func TestAutoComplete_ShortPrefix(t *testing.T) {
-	// Setup
-	repo, dictAPI, svc := setupTestService(t)
+func TestAutoComplete_Validation(t *testing.T) {
+	tests := []struct {
+		name          string
+		prefix        string
+		language      string
+		expectedError error
+	}{
+		{
+			name:          "empty prefix",
+			prefix:        "",
+			language:      "en",
+			expectedError: ErrInvalidWord,
+		},
+		{
+			name:          "single character prefix",
+			prefix:        "t",
+			language:      "en",
+			expectedError: ErrInvalidWord,
+		},
+		{
+			name:          "empty language",
+			prefix:        "test",
+			language:      "",
+			expectedError: ErrInvalidLanguage,
+		},
+		{
+			name:          "whitespace prefix",
+			prefix:        "   ",
+			language:      "en",
+			expectedError: ErrInvalidWord,
+		},
+	}
 
-	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			repo, dictAPI, svc := setupTestService(t)
+			ctx := context.Background()
 
-	// Execute with prefix that's too short
-	results, err := svc.AutoComplete(ctx, "t", "en")
+			// Execute
+			results, err := svc.AutoComplete(ctx, tt.prefix, tt.language)
 
-	// Assert
-	assert.Error(t, err)
-	assert.Equal(t, ErrInvalidWord, err)
-	assert.Nil(t, results)
+			// Assert
+			assert.Error(t, err)
+			assert.Equal(t, tt.expectedError, err)
+			assert.Nil(t, results)
 
-	// Verify no calls were made
-	repo.AssertNotCalled(t, "FindByPrefix")
-	dictAPI.AssertNotCalled(t, "FetchSuggestions")
+			// Verify no calls were made
+			repo.AssertNotCalled(t, "FindByPrefix")
+			dictAPI.AssertNotCalled(t, "FetchSuggestions")
+		})
+	}
 }
 
 func TestAutoComplete_RepositoryError(t *testing.T) {
