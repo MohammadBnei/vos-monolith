@@ -149,17 +149,12 @@ func TestFrenchWiktionaryScraper_FetchRelatedWords_ContextCancellation(t *testin
 	// Create a test API with real Wiktionary URL
 	api := createTestAPI(t)
 
-	// Create a test word
-	testWord := wordDomain.NewWord("test", "fr")
-	testWord.AddSynonym("synonym1")
-	testWord.AddAntonym("antonym1")
-
 	// Create a cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
 	// Test the FetchRelatedWords method with a cancelled context
-	_, err := api.FetchRelatedWordsData(ctx, testWord)
+	_, err := api.FetchRelatedWordsData(ctx, "testWord", "fr")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "context canceled")
 }
@@ -175,7 +170,7 @@ func TestFrenchWiktionaryScraper_FetchSuggestions(t *testing.T) {
 
 	// Test with a real French prefix
 	ctx := context.Background()
-	suggestions, err := api.FetchSuggestions(ctx, "mai", "fr")
+	suggestions, err := api.FetchSuggestionsData(ctx, "mai", "fr")
 
 	// Assert
 	assert.NoError(t, err)
@@ -193,7 +188,7 @@ func TestFrenchWiktionaryScraper_FetchSuggestions_UnsupportedLanguage(t *testing
 
 	// Test with an unsupported language
 	ctx := context.Background()
-	suggestions, err := api.FetchSuggestions(ctx, "test", "en")
+	suggestions, err := api.FetchSuggestionsData(ctx, "test", "en")
 
 	// Assert
 	assert.Error(t, err)
