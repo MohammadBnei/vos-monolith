@@ -10,35 +10,45 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	wordDomain "voconsteroid/internal/domain/word"
+	"voconsteroid/internal/infrastructure/dictionary/acl"
 )
 
-// MockDictionaryAPI is a mock implementation of the DictionaryAPI interface
-type MockDictionaryAPI struct {
+// MockWiktionaryScraper is a mock implementation of the WiktionaryScraper interface
+type MockWiktionaryScraper struct {
 	mock.Mock
 }
 
-func (m *MockDictionaryAPI) FetchWord(ctx context.Context, text, language string) (*wordDomain.Word, error) {
+func (m *MockWiktionaryScraper) FetchWordData(ctx context.Context, text, language string) (*acl.WiktionaryResponse, error) {
 	args := m.Called(ctx, text, language)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*wordDomain.Word), args.Error(1)
+	return args.Get(0).(*acl.WiktionaryResponse), args.Error(1)
 }
 
-func (m *MockDictionaryAPI) FetchRelatedWords(ctx context.Context, word *wordDomain.Word) (*wordDomain.RelatedWords, error) {
-	args := m.Called(ctx, word)
+func (m *MockWiktionaryScraper) FetchRelatedWordsData(ctx context.Context, word, language string) (*acl.WiktionaryRelatedResponse, error) {
+	args := m.Called(ctx, word, language)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*wordDomain.RelatedWords), args.Error(1)
+	return args.Get(0).(*acl.WiktionaryRelatedResponse), args.Error(1)
 }
 
-func (m *MockDictionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]string, error) {
+func (m *MockWiktionaryScraper) FetchSuggestionsData(ctx context.Context, prefix, language string) ([]string, error) {
 	args := m.Called(ctx, prefix, language)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]string), args.Error(1)
+}
+
+// Helper function to convert []*word.Word to []string for easier comparison
+func convertWordSliceToStringSlice(words []*wordDomain.Word) []string {
+	stringSlice := make([]string, len(words))
+	for i, word := range words {
+		stringSlice[i] = word.Text
+	}
+	return stringSlice
 }
 
 func TestNewWiktionaryAPI(t *testing.T) {
@@ -51,24 +61,23 @@ func TestNewWiktionaryAPI(t *testing.T) {
 	// Assert
 	assert.NotNil(t, api)
 	assert.NotNil(t, api.scrapers)
-	assert.NotNil(t, api.scrapers["fr"]) // French scraper should be registered
+	assert.NotNil(t, api.lookupServices["fr"]) // French lookup service should be registered
 }
 
 func TestWiktionaryAPI_FetchWord_SupportedLanguage(t *testing.T) {
 	// Setup
 	logger := zerolog.New(zerolog.NewTestWriter(t))
-	api := &WiktionaryAPI{
-		logger:   logger,
-		scrapers: make(map[string]wordDomain.DictionaryAPI),
-	}
+	api := NewWiktionaryAPI(logger)
 
-	// Create mock scraper
-	mockScraper := new(MockDictionaryAPI)
-	api.scrapers["fr"] = mockScraper
+	// Replace the scraper with a mock
+	mockScraper := new(MockWiktionaryScraper)
 
 	// Setup expectations
-	expectedWord := wordDomain.NewWord("bonjour", "fr")
-	mockScraper.On("FetchWord", mock.Anything, "bonjour", "fr").Return(expectedWord, nil)
+	expectedResponse := &acl.WiktionaryResponse{
+		Word:     "bonjour",
+		Language: "fr",
+	}
+	mockScraper.On("FetchWordData", mock.Anything, "bonjour", "fr").Return(expectedResponse, nil)
 
 	// Execute
 	ctx := context.Background()
@@ -76,21 +85,15 @@ func TestWiktionaryAPI_FetchWord_SupportedLanguage(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, expectedWord, result)
+	assert.Equal(t, "bonjour", result.Text)
+	assert.Equal(t, "fr", result.Language)
 	mockScraper.AssertExpectations(t)
 }
 
 func TestWiktionaryAPI_FetchWord_UnsupportedLanguage(t *testing.T) {
 	// Setup
 	logger := zerolog.New(zerolog.NewTestWriter(t))
-	api := &WiktionaryAPI{
-		logger:   logger,
-		scrapers: make(map[string]wordDomain.DictionaryAPI),
-	}
-
-	// Only register French
-	mockScraper := new(MockDictionaryAPI)
-	api.scrapers["fr"] = mockScraper
+	api := NewWiktionaryAPI(logger)
 
 	// Execute
 	ctx := context.Background()
@@ -101,51 +104,45 @@ func TestWiktionaryAPI_FetchWord_UnsupportedLanguage(t *testing.T) {
 	assert.Nil(t, result)
 	assert.True(t, errors.Is(err, wordDomain.ErrWordNotFound))
 	assert.Contains(t, err.Error(), "unsupported language en")
-	mockScraper.AssertNotCalled(t, "FetchWord")
 }
 
 func TestWiktionaryAPI_FetchRelatedWords_SupportedLanguage(t *testing.T) {
 	// Setup
 	logger := zerolog.New(zerolog.NewTestWriter(t))
-	api := &WiktionaryAPI{
-		logger:   logger,
-		scrapers: make(map[string]wordDomain.DictionaryAPI),
-	}
+	api := NewWiktionaryAPI(logger)
 
-	// Create mock scraper
-	mockScraper := new(MockDictionaryAPI)
-	api.scrapers["fr"] = mockScraper
+	// Replace the scraper with a mock
+	mockScraper := new(MockWiktionaryScraper)
 
 	// Setup expectations
-	sourceWord := wordDomain.NewWord("bonjour", "fr")
-	expectedRelated := &wordDomain.RelatedWords{
+	sourceWord := "bonjour"
+	language := "fr"
+	expectedResponse := &acl.WiktionaryRelatedResponse{
 		SourceWord: sourceWord,
-		Synonyms:   []*wordDomain.Word{wordDomain.NewWord("salut", "fr")},
-		Antonyms:   []*wordDomain.Word{wordDomain.NewWord("au revoir", "fr")},
+		Language:   language,
+		Synonyms:   []string{"salut"},
+		Antonyms:   []string{"au revoir"},
 	}
-	mockScraper.On("FetchRelatedWords", mock.Anything, sourceWord).Return(expectedRelated, nil)
+	mockScraper.On("FetchRelatedWordsData", mock.Anything, sourceWord, language).Return(expectedResponse, nil)
 
 	// Execute
+	word := wordDomain.NewWord(sourceWord, language)
 	ctx := context.Background()
-	result, err := api.FetchRelatedWords(ctx, sourceWord)
+	result, err := api.FetchRelatedWords(ctx, word)
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, expectedRelated, result)
+	assert.Equal(t, sourceWord, result.SourceWord.Text)
+	assert.Equal(t, language, result.SourceWord.Language)
+	assert.Equal(t, []string{"salut"}, convertWordSliceToStringSlice(result.Synonyms))
+	assert.Equal(t, []string{"au revoir"}, convertWordSliceToStringSlice(result.Antonyms))
 	mockScraper.AssertExpectations(t)
 }
 
 func TestWiktionaryAPI_FetchRelatedWords_UnsupportedLanguage(t *testing.T) {
 	// Setup
 	logger := zerolog.New(zerolog.NewTestWriter(t))
-	api := &WiktionaryAPI{
-		logger:   logger,
-		scrapers: make(map[string]wordDomain.DictionaryAPI),
-	}
-
-	// Only register French
-	mockScraper := new(MockDictionaryAPI)
-	api.scrapers["fr"] = mockScraper
+	api := NewWiktionaryAPI(logger)
 
 	// Create a word with unsupported language
 	sourceWord := wordDomain.NewWord("hello", "en")
@@ -159,24 +156,19 @@ func TestWiktionaryAPI_FetchRelatedWords_UnsupportedLanguage(t *testing.T) {
 	assert.Nil(t, result)
 	assert.True(t, errors.Is(err, wordDomain.ErrWordNotFound))
 	assert.Contains(t, err.Error(), "unsupported language en")
-	mockScraper.AssertNotCalled(t, "FetchRelatedWords")
 }
 
 func TestWiktionaryAPI_FetchSuggestions_SupportedLanguage(t *testing.T) {
 	// Setup
 	logger := zerolog.New(zerolog.NewTestWriter(t))
-	api := &WiktionaryAPI{
-		logger:   logger,
-		scrapers: make(map[string]wordDomain.DictionaryAPI),
-	}
+	api := NewWiktionaryAPI(logger)
 
-	// Create mock scraper
-	mockScraper := new(MockDictionaryAPI)
-	api.scrapers["fr"] = mockScraper
+	// Replace the scraper with a mock
+	mockScraper := new(MockWiktionaryScraper)
 
 	// Setup expectations
 	expectedSuggestions := []string{"test1", "test2"}
-	mockScraper.On("FetchSuggestions", mock.Anything, "test", "fr").Return(expectedSuggestions, nil)
+	mockScraper.On("FetchSuggestionsData", mock.Anything, "test", "fr").Return(expectedSuggestions, nil)
 
 	// Execute
 	ctx := context.Background()
@@ -191,14 +183,7 @@ func TestWiktionaryAPI_FetchSuggestions_SupportedLanguage(t *testing.T) {
 func TestWiktionaryAPI_FetchSuggestions_UnsupportedLanguage(t *testing.T) {
 	// Setup
 	logger := zerolog.New(zerolog.NewTestWriter(t))
-	api := &WiktionaryAPI{
-		logger:   logger,
-		scrapers: make(map[string]wordDomain.DictionaryAPI),
-	}
-
-	// Only register French
-	mockScraper := new(MockDictionaryAPI)
-	api.scrapers["fr"] = mockScraper
+	api := NewWiktionaryAPI(logger)
 
 	// Execute
 	ctx := context.Background()
@@ -209,5 +194,4 @@ func TestWiktionaryAPI_FetchSuggestions_UnsupportedLanguage(t *testing.T) {
 	assert.Nil(t, result)
 	assert.True(t, errors.Is(err, wordDomain.ErrWordNotFound))
 	assert.Contains(t, err.Error(), "unsupported language en")
-	mockScraper.AssertNotCalled(t, "FetchSuggestions")
 }

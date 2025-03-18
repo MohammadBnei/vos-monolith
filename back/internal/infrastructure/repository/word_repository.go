@@ -43,7 +43,7 @@ func (r *WordRepository) FindByID(ctx context.Context, id string) (*word.Word, e
 
 	query := `
 		SELECT id, text, language, definitions, etymology, translations, 
-		       synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
+		       synonyms, antonyms, search_terms, lemma, usage_notes, pronunciation, created_at, updated_at
 		FROM words
 		WHERE id = $1
 	`
@@ -51,10 +51,11 @@ func (r *WordRepository) FindByID(ctx context.Context, id string) (*word.Word, e
 	var w word.Word
 	var definitionsJSON []byte
 	var searchTerms []string
-	var translations map[string]string
+	var translations map[string][]string
 	var synonyms []string
 	var antonyms []string
 	var usageNotes []string
+	var pronunciation string
 
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&w.ID,
@@ -68,6 +69,7 @@ func (r *WordRepository) FindByID(ctx context.Context, id string) (*word.Word, e
 		&searchTerms,
 		&w.Lemma,
 		&usageNotes,
+		&pronunciation,
 		&w.CreatedAt,
 		&w.UpdatedAt,
 	)
@@ -89,6 +91,9 @@ func (r *WordRepository) FindByID(ctx context.Context, id string) (*word.Word, e
 	w.Synonyms = synonyms
 	w.Antonyms = antonyms
 	w.UsageNotes = usageNotes
+	w.Pronunciation = pronunciation
+	w.Pronunciation = pronunciation
+	w.Pronunciation = pronunciation
 
 	return &w, nil
 }
@@ -97,7 +102,7 @@ func (r *WordRepository) FindByID(ctx context.Context, id string) (*word.Word, e
 func (r *WordRepository) FindByText(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, etymology, translations, 
-		       synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
+		       synonyms, antonyms, search_terms, lemma, usage_notes, pronunciation, created_at, updated_at
 		FROM words
 		WHERE text = $1 AND language = $2
 	`
@@ -105,10 +110,11 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 	var w word.Word
 	var definitionsJSON []byte
 	var searchTerms []string
-	var translations map[string]string
+	var translations map[string][]string
 	var synonyms []string
 	var antonyms []string
 	var usageNotes []string
+	var pronunciation string
 
 	err := r.db.QueryRow(ctx, query, text, language).Scan(
 		&w.ID,
@@ -122,6 +128,7 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 		&searchTerms,
 		&w.Lemma,
 		&usageNotes,
+		&pronunciation,
 		&w.CreatedAt,
 		&w.UpdatedAt,
 	)
@@ -151,7 +158,7 @@ func (r *WordRepository) FindByText(ctx context.Context, text, language string) 
 func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language string) (*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, etymology, translations, 
-		        synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
+		        synonyms, antonyms, search_terms, lemma, usage_notes, pronunciation, created_at, updated_at
 		FROM words
 		WHERE language = $1 AND $2 = ANY(search_terms)
 	`
@@ -159,10 +166,11 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 	var w word.Word
 	var definitionsJSON []byte
 	var searchTerms []string
-	var translations map[string]string
+	var translations map[string][]string
 	var synonyms []string
 	var antonyms []string
 	var usageNotes []string
+	var pronunciation string
 
 	err := r.db.QueryRow(ctx, query, language, text).Scan(
 		&w.ID,
@@ -176,6 +184,7 @@ func (r *WordRepository) FindByAnyForm(ctx context.Context, text, language strin
 		&searchTerms,
 		&w.Lemma,
 		&usageNotes,
+		&pronunciation,
 		&w.CreatedAt,
 		&w.UpdatedAt,
 	)
@@ -206,9 +215,9 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 	query := `
 		INSERT INTO words (
 			id, text, language, definitions, etymology, translations, 
-			synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
+			synonyms, antonyms, search_terms, lemma, usage_notes, pronunciation, created_at, updated_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		ON CONFLICT (text, language) 
 		DO UPDATE SET 
 			definitions = $4,
@@ -219,8 +228,9 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 			search_terms = $9,
 			lemma = $10,
 			usage_notes = $11,
-			created_at = $12,
-			updated_at = $13
+			pronunciation = $12,
+			created_at = $13,
+			updated_at = $14
 		RETURNING id
 	`
 
@@ -253,6 +263,7 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 		w.SearchTerms,
 		w.Lemma,
 		w.UsageNotes,
+		w.Pronunciation,
 		w.CreatedAt,
 		w.UpdatedAt,
 	).Scan(&w.ID)
@@ -262,7 +273,7 @@ func (r *WordRepository) Save(ctx context.Context, w *word.Word) error {
 func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language string, limit int) ([]*word.Word, error) {
 	query := `
 		SELECT id, text, language, definitions, etymology, 
-		       translations, synonyms, antonyms, search_terms, lemma, usage_notes, created_at, updated_at
+		       translations, synonyms, antonyms, search_terms, lemma, usage_notes, pronunciation, created_at, updated_at
 		FROM words
 		WHERE language = $1 
 		  AND EXISTS (SELECT 1 FROM unnest(search_terms) AS term 
@@ -282,10 +293,11 @@ func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language stri
 		var w word.Word
 		var definitionsJSON []byte
 		var searchTerms []string
-		var translations map[string]string
+		var translations map[string][]string
 		var synonyms []string
 		var antonyms []string
 		var usageNotes []string
+		var pronunciation string
 
 		if err := rows.Scan(
 			&w.ID,
@@ -299,6 +311,7 @@ func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language stri
 			&searchTerms,
 			&w.Lemma,
 			&usageNotes,
+			&pronunciation,
 			&w.CreatedAt,
 			&w.UpdatedAt,
 		); err != nil {
@@ -311,9 +324,11 @@ func (r *WordRepository) FindByPrefix(ctx context.Context, prefix, language stri
 
 		w.SearchTerms = searchTerms
 		w.Translations = translations
+		w.Pronunciation = pronunciation
 		w.Synonyms = synonyms
 		w.Antonyms = antonyms
 		w.UsageNotes = usageNotes
+		w.Pronunciation = pronunciation
 
 		words = append(words, &w)
 	}
@@ -329,7 +344,7 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 	// Build query with filters
 	query := `
 		SELECT id, text, language, definitions, etymology, translations, 
-		        search_terms, lemma, created_at, updated_at
+		        search_terms, lemma, pronunciation, created_at, updated_at
 		FROM words
 		WHERE 1=1
 	`
@@ -367,18 +382,19 @@ func (r *WordRepository) List(ctx context.Context, filter map[string]interface{}
 		var w word.Word
 		var definitionsJSON []byte
 		var searchTerms []string
-		var translations map[string]string
+		var translations map[string][]string
+		var pronunciation string
 
 		err := rows.Scan(
 			&w.ID,
 			&w.Text,
 			&w.Language,
 			&definitionsJSON,
-
 			&w.Etymology,
 			&translations,
 			&searchTerms,
 			&w.Lemma,
+			&pronunciation,
 			&w.CreatedAt,
 			&w.UpdatedAt,
 		)

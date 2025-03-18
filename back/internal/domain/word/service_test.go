@@ -53,6 +53,22 @@ func (m *MockRepository) FindByPrefix(ctx context.Context, prefix, language stri
 	return args.Get(0).([]*Word), args.Error(1)
 }
 
+func (m *MockRepository) FindByID(ctx context.Context, id string) (*Word, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*Word), args.Error(1)
+}
+
+func (m *MockRepository) FindSuggestions(ctx context.Context, prefix, language string, limit int) ([]string, error) {
+	args := m.Called(ctx, prefix, language, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
 // MockDictionaryAPI is a mock implementation of the DictionaryAPI interface
 type MockDictionaryAPI struct {
 	mock.Mock
@@ -107,33 +123,65 @@ func setupTestService(t *testing.T) (*MockRepository, *MockDictionaryAPI, Servic
 }
 
 func TestSearch_ExistingWord(t *testing.T) {
-	// Setup
-	repo, dictAPI, svc := setupTestService(t)
-
-	ctx := context.Background()
-	expectedWord := &Word{
-		Text:      "test",
-		Language:  "en",
-		CreatedAt: time.Now(),
+	tests := []struct {
+		name        string
+		text        string
+		language    string
+		expectedWord *Word
+	}{
+		{
+			name: "basic word",
+			text: "test",
+			language: "en",
+			expectedWord: &Word{
+				Text:      "test",
+				Language:  "en",
+				CreatedAt: time.Now(),
+			},
+		},
+		{
+			name: "word with whitespace",
+			text: "  test  ",
+			language: "en",
+			expectedWord: &Word{
+				Text:      "test",
+				Language:  "en",
+				CreatedAt: time.Now(),
+			},
+		},
+		{
+			name: "word with mixed case",
+			text: "TeSt",
+			language: "en",
+			expectedWord: &Word{
+				Text:      "test",
+				Language:  "en",
+				CreatedAt: time.Now(),
+			},
+		},
 	}
 
-	// Expect repository to find the word by text first
-	repo.On("FindByText", ctx, "test", "en").Return(expectedWord, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			repo, dictAPI, svc := setupTestService(t)
+			ctx := context.Background()
 
-	// Add expectation for FindByAnyForm (won't be called but needs to be mocked)
-	repo.On("FindByAnyForm", ctx, "test", "en").Return(nil, errors.New("not found"))
+			// Expect repository to find the word by text first
+			repo.On("FindByText", ctx, tt.expectedWord.Text, tt.language).Return(tt.expectedWord, nil)
+			repo.On("FindByAnyForm", ctx, tt.expectedWord.Text, tt.language).Return(nil, errors.New("not found"))
 
-	// Execute
-	word, err := svc.Search(ctx, "test", "en")
+			// Execute
+			word, err := svc.Search(ctx, tt.text, tt.language)
 
-	// Assert
-	assert.NoError(t, err)
-	assert.Equal(t, expectedWord, word)
-	repo.AssertExpectations(t)
-	dictAPI.AssertNotCalled(t, "FetchWord")
-
-	// Verify that FindByAnyForm was not called since we found the word by text
-	repo.AssertNotCalled(t, "FindByAnyForm")
+			// Assert
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedWord, word)
+			repo.AssertExpectations(t)
+			dictAPI.AssertNotCalled(t, "FetchWord")
+			repo.AssertNotCalled(t, "FindByAnyForm")
+		})
+	}
 }
 
 func TestSearch_NewWord(t *testing.T) {
@@ -281,6 +329,95 @@ func TestGetRecentWords_RepositoryError(t *testing.T) {
 	repo.AssertExpectations(t)
 }
 
+func TestGetRelatedWords(t *testing.T) {
+	tests := []struct {
+		name          string
+		wordID        string
+		sourceWord    *Word
+		repoError     error
+		apiError      error
+		expectedError bool
+	}{
+		{
+			name:   "word with existing relations",
+			wordID: "word1",
+			sourceWord: &Word{
+				ID:       "word1",
+				Text:     "test",
+				Language: "en",
+				Synonyms: []string{"syn1", "syn2"},
+				Antonyms: []string{"ant1"},
+			},
+		},
+		{
+			name:   "word needing API fetch",
+			wordID: "word2",
+			sourceWord: &Word{
+				ID:       "word2",
+				Text:     "test",
+				Language: "en",
+			},
+		},
+		{
+			name:          "word not found",
+			wordID:       "word3",
+			repoError:     ErrWordNotFound,
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			repo, dictAPI, svc := setupTestService(t)
+			ctx := context.Background()
+
+			// Mock repository
+			repo.On("FindByID", ctx, tt.wordID).Return(tt.sourceWord, tt.repoError)
+
+			if tt.sourceWord != nil && len(tt.sourceWord.Synonyms) == 0 && len(tt.sourceWord.Antonyms) == 0 {
+				// Mock API call for related words
+				relatedWords := &RelatedWords{
+					SourceWord: tt.sourceWord,
+					Synonyms: []*Word{
+						{Text: "syn1", Language: "en"},
+						{Text: "syn2", Language: "en"},
+					},
+					Antonyms: []*Word{
+						{Text: "ant1", Language: "en"},
+					},
+				}
+				dictAPI.On("FetchRelatedWords", ctx, tt.sourceWord).Return(relatedWords, tt.apiError)
+				repo.On("Save", ctx, mock.Anything).Return(nil)
+			}
+
+			// Execute
+			result, err := svc.GetRelatedWords(ctx, tt.wordID)
+
+			// Assert
+			if tt.expectedError {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.Equal(t, tt.sourceWord, result.SourceWord)
+
+			if len(tt.sourceWord.Synonyms) > 0 || len(tt.sourceWord.Antonyms) > 0 {
+				assert.Len(t, result.Synonyms, len(tt.sourceWord.Synonyms))
+				assert.Len(t, result.Antonyms, len(tt.sourceWord.Antonyms))
+			} else {
+				assert.Len(t, result.Synonyms, 2)
+				assert.Len(t, result.Antonyms, 1)
+			}
+
+			repo.AssertExpectations(t)
+			dictAPI.AssertExpectations(t)
+		})
+	}
+}
+
 func TestAutoComplete(t *testing.T) {
 	// Setup
 	repo, dictAPI, svc := setupTestService(t)
@@ -317,23 +454,52 @@ func TestAutoComplete(t *testing.T) {
 	dictAPI.AssertExpectations(t)
 }
 
-func TestAutoComplete_ShortPrefix(t *testing.T) {
-	// Setup
-	repo, dictAPI, svc := setupTestService(t)
+func TestAutoComplete_Validation(t *testing.T) {
+	tests := []struct {
+		name          string
+		prefix        string
+		language      string
+		expectedError error
+	}{
+		{
+			name:          "empty prefix",
+			prefix:        "",
+			language:      "en",
+			expectedError: ErrInvalidWord,
+		},
+		{
+			name:          "single character prefix",
+			prefix:        "t",
+			language:      "en",
+			expectedError: ErrInvalidWord,
+		},
+		{
+			name:          "whitespace prefix",
+			prefix:        "   ",
+			language:      "en",
+			expectedError: ErrInvalidWord,
+		},
+	}
 
-	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			repo, dictAPI, svc := setupTestService(t)
+			ctx := context.Background()
 
-	// Execute with prefix that's too short
-	results, err := svc.AutoComplete(ctx, "t", "en")
+			// Execute
+			results, err := svc.AutoComplete(ctx, tt.prefix, tt.language)
 
-	// Assert
-	assert.Error(t, err)
-	assert.Equal(t, ErrInvalidWord, err)
-	assert.Nil(t, results)
+			// Assert
+			assert.Error(t, err)
+			assert.Equal(t, tt.expectedError, err)
+			assert.Nil(t, results)
 
-	// Verify no calls were made
-	repo.AssertNotCalled(t, "FindByPrefix")
-	dictAPI.AssertNotCalled(t, "FetchSuggestions")
+			// Verify no calls were made
+			repo.AssertNotCalled(t, "FindByPrefix")
+			dictAPI.AssertNotCalled(t, "FetchSuggestions")
+		})
+	}
 }
 
 func TestAutoComplete_RepositoryError(t *testing.T) {

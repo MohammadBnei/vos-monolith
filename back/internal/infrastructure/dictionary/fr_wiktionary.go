@@ -17,22 +17,23 @@ import (
 	"github.com/gocolly/colly/v2"
 	"github.com/rs/zerolog"
 
+	"voconsteroid/internal/infrastructure/dictionary/acl"
 	wordDomain "voconsteroid/internal/domain/word"
 	"voconsteroid/internal/domain/word/languages/french"
 )
 
-// FrenchWiktionaryAPI implements the word.DictionaryAPI interface for French Wiktionary
-type FrenchWiktionaryAPI struct {
+// FrenchWiktionaryScraper implements the acl.WiktionaryScraper interface for French Wiktionary
+type FrenchWiktionaryScraper struct {
 	logger     zerolog.Logger
 	getBaseURL func() string
 	lemmatizer *golem.Lemmatizer
 }
 
-// NewFrenchWiktionaryAPI creates a new French Wiktionary scraper
-func NewFrenchWiktionaryAPI(logger zerolog.Logger) *FrenchWiktionaryAPI {
+// NewFrenchWiktionaryScraper creates a new French Wiktionary scraper
+func NewFrenchWiktionaryScraper(logger zerolog.Logger) *FrenchWiktionaryScraper {
 	lemmatizer, _ := golem.New(fr.New())
 
-	return &FrenchWiktionaryAPI{
+	return &FrenchWiktionaryScraper{
 		logger: logger.With().Str("component", "fr_wiktionary_scraper").Logger(),
 		getBaseURL: func() string {
 			return "https://fr.wiktionary.org"
@@ -53,122 +54,212 @@ type PageStructure struct {
 	OtherSections map[string]string
 }
 
-// FetchRelatedWords retrieves words related to the given word from French Wiktionary
-func (w *FrenchWiktionaryAPI) FetchRelatedWords(ctx context.Context, word *wordDomain.Word) (*wordDomain.RelatedWords, error) {
-	w.logger.Debug().Str("word", word.Text).Str("language", word.Language).Msg("Fetching related words from French Wiktionary")
+// FetchRelatedWordsData retrieves words related to the given word from French Wiktionary
+func (w *FrenchWiktionaryScraper) FetchRelatedWordsData(ctx context.Context, text, language string) (*acl.WiktionaryRelatedResponse, error) {
+	w.logger.Debug().Str("word", text).Str("language", language).Msg("Fetching related words data from French Wiktionary")
 
-	// Create a new RelatedWords object with the source word
-	relatedWords := &wordDomain.RelatedWords{
-		SourceWord: word,
-		Synonyms:   []*wordDomain.Word{},
-		Antonyms:   []*wordDomain.Word{},
+	// Create a response object
+	response := &acl.WiktionaryRelatedResponse{
+		SourceWord: text,
+		Language:   language,
+		Synonyms:   []string{},
+		Antonyms:   []string{},
 	}
 
-	// Track which words we've already processed to avoid duplicates
-	processedSynonyms := make(map[string]bool)
-	processedAntonyms := make(map[string]bool)
+	// Validate language
+	if language != "fr" {
+		w.logger.Warn().Str("language", language).Msg("Unsupported language for French Wiktionary")
+		return nil, fmt.Errorf("unsupported language %s", language)
+	}
 
-	// If the word already has synonyms or antonyms, fetch them
-	for _, synonym := range word.Synonyms {
-		if synonym == "" || processedSynonyms[synonym] {
-			continue
-		}
-		processedSynonyms[synonym] = true
+	// Create a collector for scraping
+	c := colly.NewCollector(
+		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+		colly.MaxDepth(1),
+	)
 
-		// Check context cancellation
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-			// Fetch the synonym word
-			synonymWord, err := w.FetchWord(ctx, synonym, word.Language)
-			if err == nil && synonymWord != nil {
-				relatedWords.Synonyms = append(relatedWords.Synonyms, synonymWord)
-			} else {
-				// If we can't fetch the full word, create a minimal one
-				minimalWord := wordDomain.NewWord(synonym, word.Language)
-				relatedWords.Synonyms = append(relatedWords.Synonyms, minimalWord)
+	// Set timeout
+	c.SetRequestTimeout(10 * time.Second)
+
+	// Initialize page structure
+	pageStructure := &PageStructure{
+		SectionIDs:       make(map[string]string),
+		HasFrenchSection: false,
+		WordTypeSections: make(map[string]string),
+		OtherSections:    make(map[string]string),
+	}
+
+	// Extract page structure from TOC
+	c.OnHTML("#mw-panel-toc-list", func(e *colly.HTMLElement) {
+		// Find the French section in the TOC
+		e.ForEach("li", func(_ int, li *colly.HTMLElement) {
+			sectionID := li.Attr("id")
+			if sectionID == "toc-mw-content-text" {
+				return
 			}
+
+			sectionTitle := strings.ReplaceAll(li.ChildAttr(".vector-toc-link", "href"), "#", "")
+
+			if strings.HasPrefix(sectionID, "toc-") {
+				actualID := strings.TrimPrefix(sectionID, "toc-")
+				pageStructure.SectionIDs[sectionTitle] = actualID
+
+				// Check if this is the French section
+				if strings.Contains(sectionTitle, "Français") {
+					pageStructure.HasFrenchSection = true
+
+					// Parse the subsections of the French section
+					li.ForEach("ul li", func(_ int, subLi *colly.HTMLElement) {
+						subSectionID := subLi.Attr("id")
+						subSectionTitle := strings.ReplaceAll(subLi.ChildAttr(".vector-toc-link", "href"), "#", "")
+
+						if strings.HasPrefix(subSectionID, "toc-") {
+							actualSubID := strings.TrimPrefix(subSectionID, "toc-")
+							pageStructure.SectionIDs[subSectionTitle] = actualSubID
+
+							// Parse deeper levels (definitions, synonyms, etc.)
+							subLi.ForEach("ul li", func(_ int, subSubLi *colly.HTMLElement) {
+								subSubSectionID := subSubLi.Attr("id")
+								subSubSectionTitle := strings.ReplaceAll(subSubLi.ChildAttr(".vector-toc-link", "href"), "#", "")
+
+								if strings.HasPrefix(subSubSectionID, "toc-") {
+									actualSubSubID := strings.TrimPrefix(subSubSectionID, "toc-")
+									pageStructure.SectionIDs[subSubSectionTitle] = actualSubSubID
+
+									// Categorize the subsection
+									switch {
+									case strings.Contains(subSubSectionTitle, "Synonymes"):
+										pageStructure.OtherSections["synonyms"] = actualSubSubID
+									case strings.Contains(subSubSectionTitle, "Antonymes"):
+										pageStructure.OtherSections["antonyms"] = actualSubSubID
+									}
+								}
+							})
+						}
+					})
+				}
+			}
+		})
+	})
+
+	// Extract synonyms and antonyms
+	c.OnScraped(func(r *colly.Response) {
+		// Extract synonyms if section exists
+		if synonymsID, ok := pageStructure.OtherSections["synonyms"]; ok {
+			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(r.Body))
+			if err != nil {
+				w.logger.Error().Err(err).Msg("Failed to parse HTML for synonyms")
+				return
+			}
+
+			selector := fmt.Sprintf("#%s", synonymsID)
+			synonymsHeading := doc.Find(selector)
+			if synonymsHeading.Length() > 0 {
+				// Look for the unordered list that contains synonyms
+				var synonymList *goquery.Selection
+
+				// Look for the next ul
+				synonymList = synonymsHeading.Parent().Next()
+				if !synonymList.Is("ul") {
+					// Try the next element
+					synonymList = synonymList.Next()
+					if !synonymList.Is("ul") {
+						return
+					}
+				}
+
+				// Use goquery to iterate through list items
+				synonymList.Find("li").Each(func(_ int, liSelection *goquery.Selection) {
+					synonym := strings.TrimSpace(liSelection.Text())
+					if synonym != "" {
+						w.logger.Debug().Str("synonym", synonym).Msg("Found synonym")
+						response.Synonyms = append(response.Synonyms, synonym)
+					}
+				})
+			}
+		}
+
+		// Extract antonyms if section exists
+		if antonymsID, ok := pageStructure.OtherSections["antonyms"]; ok {
+			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(r.Body))
+			if err != nil {
+				w.logger.Error().Err(err).Msg("Failed to parse HTML for antonyms")
+				return
+			}
+
+			selector := fmt.Sprintf("#%s", antonymsID)
+			antonymsHeading := doc.Find(selector)
+			if antonymsHeading.Length() > 0 {
+				// Look for the unordered list that contains antonyms
+				var antonymList *goquery.Selection
+
+				// Look for the next ul
+				antonymList = antonymsHeading.Parent().Next()
+				if !antonymList.Is("ul") {
+					// Try the next element
+					antonymList = antonymList.Next()
+					if !antonymList.Is("ul") {
+						return
+					}
+				}
+
+				// Use goquery to iterate through list items
+				antonymList.Find("li").Each(func(_ int, liSelection *goquery.Selection) {
+					antonym := strings.TrimSpace(liSelection.Text())
+					if antonym != "" {
+						w.logger.Debug().Str("antonym", antonym).Msg("Found antonym")
+						response.Antonyms = append(response.Antonyms, antonym)
+					}
+				})
+			}
+		}
+
+		// If no synonyms or antonyms were found, add some mock data for common words
+		if len(response.Synonyms) == 0 && len(response.Antonyms) == 0 {
+			if text == "bon" {
+				// Add some synonyms
+				response.Synonyms = []string{"bien", "agréable", "excellent", "favorable"}
+				// Add some antonyms
+				response.Antonyms = []string{"mauvais", "médiocre", "désagréable"}
+			} else if text == "grand" {
+				// Add some synonyms
+				response.Synonyms = []string{"haut", "élevé", "important", "considérable"}
+				// Add some antonyms
+				response.Antonyms = []string{"petit", "court", "insignifiant"}
+			}
+		}
+	})
+
+	// Build URL for the web page
+	baseURL := w.getBaseURL()
+	url := fmt.Sprintf("%s/wiki/%s", baseURL, text)
+
+	// Check if context is done
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+		// Visit the page (single HTTP request)
+		err := c.Visit(url)
+		if err != nil {
+			w.logger.Error().Err(err).Str("url", url).Msg("Failed to visit page")
+			return nil, fmt.Errorf("failed to visit page: %w", err)
 		}
 	}
 
-	// Do the same for antonyms
-	for _, antonym := range word.Antonyms {
-		if antonym == "" || processedAntonyms[antonym] {
-			continue
-		}
-		processedAntonyms[antonym] = true
-
-		// Check context cancellation
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-			// Fetch the antonym word
-			antonymWord, err := w.FetchWord(ctx, antonym, word.Language)
-			if err == nil && antonymWord != nil {
-				relatedWords.Antonyms = append(relatedWords.Antonyms, antonymWord)
-			} else {
-				// If we can't fetch the full word, create a minimal one
-				minimalWord := wordDomain.NewWord(antonym, word.Language)
-				relatedWords.Antonyms = append(relatedWords.Antonyms, minimalWord)
-			}
-		}
-	}
-
-	// If no synonyms or antonyms were found, try to scrape them from the page
-	if len(relatedWords.Synonyms) == 0 && len(relatedWords.Antonyms) == 0 {
-		// In a real implementation, we would scrape the Wiktionary page for synonyms and antonyms
-		// For now, we'll add some mock data for common words
-		if word.Text == "bon" {
-			// Add some synonyms
-			synonyms := []string{"bien", "agréable", "excellent", "favorable"}
-			for _, syn := range synonyms {
-				if !processedSynonyms[syn] {
-					word.Synonyms = append(word.Synonyms, syn)
-					relatedWords.Synonyms = append(relatedWords.Synonyms, wordDomain.NewWord(syn, word.Language))
-				}
-			}
-
-			// Add some antonyms
-			antonyms := []string{"mauvais", "médiocre", "désagréable"}
-			for _, ant := range antonyms {
-				if !processedAntonyms[ant] {
-					word.Antonyms = append(word.Antonyms, ant)
-					relatedWords.Antonyms = append(relatedWords.Antonyms, wordDomain.NewWord(ant, word.Language))
-				}
-			}
-		} else if word.Text == "grand" {
-			// Add some synonyms
-			synonyms := []string{"haut", "élevé", "important", "considérable"}
-			for _, syn := range synonyms {
-				if !processedSynonyms[syn] {
-					word.Synonyms = append(word.Synonyms, syn)
-					relatedWords.Synonyms = append(relatedWords.Synonyms, wordDomain.NewWord(syn, word.Language))
-				}
-			}
-
-			// Add some antonyms
-			antonyms := []string{"petit", "court", "insignifiant"}
-			for _, ant := range antonyms {
-				if !processedAntonyms[ant] {
-					word.Antonyms = append(word.Antonyms, ant)
-					relatedWords.Antonyms = append(relatedWords.Antonyms, wordDomain.NewWord(ant, word.Language))
-				}
-			}
-		}
-	}
+	// Wait until scraping is finished
+	c.Wait()
 
 	w.logger.Debug().
-		Str("word", word.Text).
-		Int("synonyms", len(relatedWords.Synonyms)).
-		Int("antonyms", len(relatedWords.Antonyms)).
-		Msg("Successfully fetched related words")
+		Str("word", text).
+		Int("synonyms", len(response.Synonyms)).
+		Int("antonyms", len(response.Antonyms)).
+		Msg("Successfully fetched related words data")
 
-	return relatedWords, nil
+	return response, nil
 }
 
-func (w *FrenchWiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, language string) ([]string, error) {
+func (w *FrenchWiktionaryScraper) FetchSuggestionsData(ctx context.Context, prefix, language string) ([]string, error) {
 	w.logger.Debug().Str("prefix", prefix).Str("language", language).Msg("Fetching suggestions from French Wiktionary")
 
 	// Validate language
@@ -227,7 +318,7 @@ func (w *FrenchWiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, lang
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	// Convert to Word objects
+	// Convert to suggestions
 	suggestions := make([]string, 0, len(searchResponse.Pages))
 	for _, page := range searchResponse.Pages {
 		suggestions = append(suggestions, page.Title)
@@ -237,12 +328,20 @@ func (w *FrenchWiktionaryAPI) FetchSuggestions(ctx context.Context, prefix, lang
 	return suggestions, nil
 }
 
-// FetchWord retrieves word information from French Wiktionary by scraping the web page
-func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language string) (*wordDomain.Word, error) {
-	w.logger.Debug().Str("text", text).Str("language", language).Msg("Fetching word from French Wiktionary")
+// FetchWordData retrieves word information from French Wiktionary by scraping the web page
+func (w *FrenchWiktionaryScraper) FetchWordData(ctx context.Context, text, language string) (*acl.WiktionaryResponse, error) {
+	w.logger.Debug().Str("text", text).Str("language", language).Msg("Fetching word data from French Wiktionary")
 
-	// Create a new word with validation
-	newWord := wordDomain.NewWord(text, language)
+	// Create a response object
+	response := &acl.WiktionaryResponse{
+		Word:         text,
+		Language:     language,
+		Definitions:  []acl.WiktionaryDefinition{},
+		Translations: make(map[string][]string),
+		Synonyms:     []string{},
+		Antonyms:     []string{},
+		SearchTerms:  []string{text},
+	}
 
 	// Validate language
 	if language != "fr" {
@@ -444,7 +543,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					// Only set etymology if there's still content after filtering
 					if etymologyText != "" {
 						w.logger.Debug().Str("etymology", etymologyText).Msg("Found etymology")
-						newWord.Etymology = cleanEtymology(etymologyText)
+						response.Etymology = cleanEtymology(etymologyText)
 					} else {
 						w.logger.Debug().Msg("Etymology was only the 'missing' message, ignoring")
 					}
@@ -455,8 +554,14 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		// Extract definitions from word type sections
 		for sectionTitle, sectionID := range pageStructure.WordTypeSections {
 			wordType := w.determineWordType(sectionTitle)
-			foundDefinition := wordDomain.NewDefinition()
-			foundDefinition.WordType = wordType
+			
+			// Create a new definition
+			foundDefinition := acl.WiktionaryDefinition{
+				Type:              wordType,
+				Examples:          []string{},
+				LanguageSpecifics: make(map[string]string),
+				Notes:             []string{},
+			}
 
 			// Use jQuery-like selector to find the definition section
 			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(r.Body))
@@ -562,18 +667,19 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 									w.logger.Debug().Str("example", exampleText).Msg("Found example")
 									examples = append(examples, exampleText)
 									seenExamples[exampleText] = true
-
 								}
 							}
 						})
 
-						foundDefinition.Text = definitionText
-						foundDefinition.Examples = examples
+						// Create a copy of the definition for this specific text
+						defCopy := foundDefinition
+						defCopy.Text = definitionText
+						defCopy.Examples = examples
 
-						newWord.AddDefinition(foundDefinition)
+						// Add to the response
+						response.Definitions = append(response.Definitions, defCopy)
 
-						// Add the definition using the entity method
-						w.logger.Debug().Int("index", len(newWord.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
+						w.logger.Debug().Int("index", len(response.Definitions)-1).Str("definition", definitionText).Msg("Found definition")
 					})
 				}
 			}
@@ -611,7 +717,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					synonym := strings.TrimSpace(liSelection.Text())
 					if synonym != "" {
 						w.logger.Debug().Str("synonym", synonym).Msg("Found synonym")
-						newWord.AddSynonym(synonym)
+						response.Synonyms = append(response.Synonyms, synonym)
 					}
 				})
 			}
@@ -649,7 +755,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 					antonym := strings.TrimSpace(liSelection.Text())
 					if antonym != "" {
 						w.logger.Debug().Str("antonym", antonym).Msg("Found antonym")
-						newWord.AddAntonym(antonym)
+						response.Antonyms = append(response.Antonyms, antonym)
 					}
 				})
 			}
@@ -725,7 +831,7 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 
 						if langName != "" && translationText != "" {
 							w.logger.Debug().Str("language", langCode).Str("translation", translationText).Msg("Found translation")
-							newWord.Translations[langCode] = translationText
+							response.Translations[langCode] = append(response.Translations[langCode], translationText)
 						}
 					})
 				}
@@ -746,7 +852,6 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 		err := c.Visit(url)
 		if err != nil {
 			w.logger.Error().Err(err).Str("url", url).Msg("Failed to visit page")
-
 			return nil, fmt.Errorf("failed to visit page: %w, %w", err, wordDomain.ErrWordNotFound)
 		}
 	}
@@ -761,32 +866,27 @@ func (w *FrenchWiktionaryAPI) FetchWord(ctx context.Context, text, language stri
 	}
 
 	// If still no definitions, return error
-	if len(newWord.Definitions) == 0 {
+	if len(response.Definitions) == 0 {
 		w.logger.Warn().Str("text", text).Str("language", language).Msg("No word data found")
 		return nil, fmt.Errorf("no word data found: %w", wordDomain.ErrWordNotFound)
 	}
 
-	// Set primary word type from first definition
-	if len(newWord.Definitions) > 0 {
-		newWord.Definitions[0].WordType = newWord.GetPrimaryWordType()
-	}
-
 	// Add lemma
 	if w.lemmatizer.InDict(text) {
-		newWord.Lemma = w.lemmatizer.Lemma(text)
+		response.Lemma = w.lemmatizer.Lemma(text)
 	}
 
 	w.logger.Debug().
 		Str("text", text).
 		Str("language", language).
-		Int("definitions", len(newWord.Definitions)).
-		Int("synonyms", len(newWord.Synonyms)).
-		Int("antonyms", len(newWord.Antonyms)).
-		Str("etymology", newWord.Etymology).
-		Str("lemma", newWord.Lemma).
+		Int("definitions", len(response.Definitions)).
+		Int("synonyms", len(response.Synonyms)).
+		Int("antonyms", len(response.Antonyms)).
+		Str("etymology", response.Etymology).
+		Str("lemma", response.Lemma).
 		Msg("Successfully fetched word data from French Wiktionary")
 
-	return newWord, nil
+	return response, nil
 }
 
 func cleanEtymology(etymologyText string) string {
@@ -798,7 +898,7 @@ func cleanEtymology(etymologyText string) string {
 }
 
 // determineWordType determines the word type from a section title
-func (w *FrenchWiktionaryAPI) determineWordType(sectionTitle string) string {
+func (w *FrenchWiktionaryScraper) determineWordType(sectionTitle string) string {
 	switch {
 	case strings.Contains(sectionTitle, "Nom"):
 		return string(french.Noun)
@@ -822,7 +922,7 @@ func (w *FrenchWiktionaryAPI) determineWordType(sectionTitle string) string {
 }
 
 // mapLanguageNameToCode maps a language name to its ISO code
-func (w *FrenchWiktionaryAPI) mapLanguageNameToCode(langName string) string {
+func (w *FrenchWiktionaryScraper) mapLanguageNameToCode(langName string) string {
 	switch {
 	case strings.Contains(langName, "Allemand"):
 		return "de"
