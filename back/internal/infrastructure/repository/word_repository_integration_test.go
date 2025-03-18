@@ -121,7 +121,7 @@ func createTestWord() *word.Word {
 			},
 		},
 		Etymology:    "from Latin testum, meaning 'earthen pot'",
-		Translations: map[string]string{"fr": "test", "es": "prueba"},
+		Translations: map[string][]string{"fr": {"test"}, "es": {"prueba"}},
 		SearchTerms:  []string{"test", "tests"},
 		Lemma:        "test",
 		CreatedAt:    now,
